@@ -19,9 +19,8 @@ with this program; if not, write to the Free Software Foundation, Inc.,
 namespace Fossology\Lib\Data\Clearing;
 
 use Fossology\Lib\Data\LicenseRef;
-use Fossology\Lib\Util\Object;
 
-class ClearingLicense extends Object
+class ClearingLicense
 {
 
   private $licenseRef;
@@ -58,7 +57,8 @@ class ClearingLicense extends Object
    */
   public function copyNegated()
   {
-    return new ClearingLicense($this->licenseRef, !($this->removed), $this->type, $this->reportInfo, $this->comment, $this->acknowledgement);
+    return new ClearingLicense($this->licenseRef, ! ($this->removed),
+      $this->type, $this->reportInfo, $this->comment, $this->acknowledgement);
   }
 
   /**
@@ -146,5 +146,4 @@ class ClearingLicense extends Object
       .")";
 
   }
-
 }

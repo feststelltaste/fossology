@@ -21,9 +21,8 @@ namespace Fossology\Lib\Data;
 
 use Fossology\Lib\Data\Clearing\ClearingEvent;
 use Fossology\Lib\Data\Clearing\ClearingLicense;
-use Fossology\Lib\Util\Object;
 
-class ClearingDecision extends Object
+class ClearingDecision
 {
   /** @var bool */
   private $sameFolder;
@@ -115,7 +114,7 @@ class ClearingDecision extends Object
   public function getClearingLicenses()
   {
     $clearingLicenses = array();
-    foreach($this->clearingEvents as $clearingEvent) {
+    foreach ($this->clearingEvents as $clearingEvent) {
       $clearingLicenses[] = $clearingEvent->getClearingLicense();
     }
     return $clearingLicenses;
@@ -127,11 +126,9 @@ class ClearingDecision extends Object
   public function getPositiveLicenses()
   {
     $result = array();
-    foreach($this->clearingEvents as $clearingEvent)
-    {
+    foreach ($this->clearingEvents as $clearingEvent) {
       $clearingLicense = $clearingEvent->getClearingLicense();
-      if (!$clearingLicense->isRemoved())
-      {
+      if (! $clearingLicense->isRemoved()) {
         $result[] = $clearingLicense->getLicenseRef();
       }
     }
@@ -224,10 +221,11 @@ class ClearingDecision extends Object
    */
   public function isInScope()
   {
-    switch ($this->getScope())
-    {
-      case 'global': return true;
-      case 'upload': return $this->sameFolder;
+    switch ($this->getScope()) {
+      case 'global':
+        return true;
+      case 'upload':
+        return $this->sameFolder;
     }
     return false;
   }
@@ -237,10 +235,9 @@ class ClearingDecision extends Object
     $output = "ClearingDecision(#" . $this->clearingId . ", ";
 
     foreach ($this->clearingLicenses as $clearingLicense) {
-      $output .= ($clearingLicense->isRemoved() ? "-": "" ). $clearingLicense->getShortName() . ", ";
+      $output .= ($clearingLicense->isRemoved() ? "-" : ""). $clearingLicense->getShortName() . ", ";
     }
 
     return $output . $this->getUserName() . ")";
   }
-
 }

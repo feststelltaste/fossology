@@ -70,6 +70,10 @@ class SchedulerTestRunnerMock implements SchedulerTestRunner
     $this->agentLicenseEventProcessor = $agentLicenseEventProcessor;
   }
 
+  /**
+   * @copydoc SchedulerTestRunner::run()
+   * @see SchedulerTestRunner::run()
+   */
   public function run($uploadId, $userId=2, $groupId=2, $jobId=1, $args="")
   {
     $GLOBALS['userId'] = $userId;
@@ -79,8 +83,7 @@ class SchedulerTestRunnerMock implements SchedulerTestRunner
     $matches = array();
 
     $opts = array();
-    if (preg_match("/-r([0-9]*)/", $args, $matches))
-    {
+    if (preg_match("/-r([0-9]*)/", $args, $matches)) {
       $opts['r'] = $matches[1];
     }
 
@@ -98,10 +101,10 @@ class SchedulerTestRunnerMock implements SchedulerTestRunner
     $container->shouldReceive('get')->with('businessrules.agent_license_event_processor')->andReturn($this->agentLicenseEventProcessor);
     $GLOBALS['container'] = $container;
 
-    $fgetsMock = M::mock(\Fossology\Lib\Agent\FgetsMock::classname());
+    $fgetsMock = M::mock(\Fossology\Lib\Agent\FgetsMock::class);
     $fgetsMock->shouldReceive("fgets")->with(STDIN)->andReturn($uploadId, false);
     $GLOBALS['fgetsMock'] = $fgetsMock;
-    
+
     $exitval = 0;
 
     ob_start();
@@ -112,5 +115,4 @@ class SchedulerTestRunnerMock implements SchedulerTestRunner
 
     return array(true, $output, $exitval);
   }
-  
 }

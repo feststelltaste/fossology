@@ -28,6 +28,9 @@ extern char *DBConfFile;
 
 /**
  * \brief for function ListFolders
+ * \test
+ * -# List folders using listFolders()
+ * -# Check for the return code
  */
 void testListFolders()
 {
@@ -35,15 +38,18 @@ void testListFolders()
   char *ErrorBuf;
   int rc;
 
-  db_conn = fo_dbconnect(DBConfFile, &ErrorBuf);
+  pgConn = fo_dbconnect(DBConfFile, &ErrorBuf);
   /** exectue the tested function */
   rc = listFolders(3, 10);
-  PQfinish(db_conn);
+  PQfinish(pgConn);
   CU_ASSERT_EQUAL(rc, 0);
   CU_PASS("ListFolders PASS!");
 }
 /**
  * \brief for function ListUploads
+ * \test
+ * -# List uploads using listUploads()
+ * -# Check for the return code
  */
 void testListUploads()
 {
@@ -51,11 +57,11 @@ void testListUploads()
   char *ErrorBuf;
   int rc;
 
-  db_conn = fo_dbconnect(DBConfFile, &ErrorBuf);
+  pgConn = fo_dbconnect(DBConfFile, &ErrorBuf);
   /** exectue the tested function */
   rc = listUploads(3, 10);
 
-  PQfinish(db_conn);
+  PQfinish(pgConn);
   CU_ASSERT_EQUAL(rc, 0);
   CU_PASS("ListUploads PASS!");
 }

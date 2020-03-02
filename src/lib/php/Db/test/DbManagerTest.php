@@ -21,7 +21,7 @@ namespace Fossology\Lib\Db;
 use Mockery as M;
 use Mockery\MockInterface;
 
-abstract class DbManagerTest extends \PHPUnit_Framework_TestCase
+abstract class DbManagerTest extends \PHPUnit\Framework\TestCase
 {
   /** @var Driver|MockInterface */
   protected $driver;
@@ -35,12 +35,12 @@ abstract class DbManagerTest extends \PHPUnit_Framework_TestCase
     $this->driver = M::mock('Fossology\\Lib\\Db\\Driver');
     $this->driver->shouldReceive('booleanToDb')->with(true)->andReturn('t');
     $this->driver->shouldReceive('booleanToDb')->with(false)->andReturn('f');
-    $this->driver->shouldReceive('escapeString')->andReturnUsing(function($v){return pg_escape_string($v);});
+    $this->driver->shouldReceive('escapeString')->andReturnUsing(function ($v){
+      return pg_escape_string($v);
+    });
 
     $this->logger = M::mock('Monolog\\Logger');
     $this->logger->shouldReceive('addDebug');
-    
-    // $this->dbManager->setDriver($this->driver);
   }
 
   function tearDown()
@@ -60,7 +60,7 @@ abstract class DbManagerTest extends \PHPUnit_Framework_TestCase
     $this->dbManager->begin();
     $this->dbManager->begin();
   }
-  
+
   /**
    * @expectedException \Exception
    */
@@ -69,7 +69,7 @@ abstract class DbManagerTest extends \PHPUnit_Framework_TestCase
     $this->driver->shouldReceive("commit")->withNoArgs()->never();
     $this->dbManager->commit();
   }
-  
+
   function testBeginAndCommitTransaction()
   {
     $this->driver->shouldReceive("begin")->withNoArgs()->once();
@@ -77,34 +77,34 @@ abstract class DbManagerTest extends \PHPUnit_Framework_TestCase
     $this->driver->shouldReceive("commit")->withNoArgs()->once();
     $this->dbManager->commit();
   }
-  
+
   abstract function testInsertTableRow();
-  
+
   function testFlushStats()
   {
     $this->driver->shouldReceive('prepare');
     $sqlStmt = 'foo';
     $this->dbManager->prepare($sqlStmt,'SELECT elephant FROM africa');
-    $this->logger->shouldReceive('addDebug')->with("/executing '$sqlStmt' took /");
+    $this->logger->shouldReceive('addDebug')->with(M::pattern("/executing '$sqlStmt' took /"));
     $this->dbManager->flushStats();
   }
-  
+
   abstract function testCreateMap();
-  
+
   function testExistsDb_no()
   {
-    $this->driver->shouldReceive('existsTable')->with('/dTable/')->andReturn(FALSE);
+    $this->driver->shouldReceive('existsTable')->with(M::pattern('/dTable/'))->andReturn(FALSE);
     $existsTable = $this->dbManager->existsTable('badTable');
     assertThat($existsTable, is(FALSE));
   }
-  
+
   function testExistsDb_yes()
   {
-    $this->driver->shouldReceive('existsTable')->with('/dTable/')->andReturn(TRUE);
+    $this->driver->shouldReceive('existsTable')->with(M::pattern('/dTable/'))->andReturn(TRUE);
     $existsTable = $this->dbManager->existsTable('goodTable');
     assertThat($existsTable, is(TRUE));
   }
-  
+
   /**
    * @expectedException \Exception
    */
@@ -112,7 +112,7 @@ abstract class DbManagerTest extends \PHPUnit_Framework_TestCase
   {
     $this->dbManager->existsTable("goodTable' OR 3<'4");
   }
-  
+
   function testInsertTableRowReturning()
   {
     $this->driver->shouldReceive('query');

@@ -21,7 +21,7 @@ with this program; if not, write to the Free Software Foundation, Inc.,
 #include "utility.h"
 
 /**
- * \file testSetEnv.c
+ * \file
  * \brief testing for the function SetEnv()
  */
 
@@ -36,9 +36,9 @@ static char TempFileDir[MAX_LENGTH];
 int  SetEnvInit()
 {
   GlobalUploadKey = -1;
-  memset(GlobalTempFile, 0, MAXCMD);
-  memset(GlobalURL, 0, MAXCMD);
-  memset(GlobalParam, 0, MAXCMD);
+  memset(GlobalTempFile, 0, STRMAX);
+  memset(GlobalURL, 0, URLMAX);
+  memset(GlobalParam, 0, STRMAX);
   return 0;
 }
 
@@ -48,13 +48,17 @@ int  SetEnvInit()
 int  SetEnvClean()
 {
   GlobalUploadKey = -1;
-  memset(GlobalTempFile, 0, MAXCMD);
-  memset(GlobalURL, 0, MAXCMD);
-  memset(GlobalParam, 0, MAXCMD);
+  memset(GlobalTempFile, 0, STRMAX);
+  memset(GlobalURL, 0, URLMAX);
+  memset(GlobalParam, 0, STRMAX);
   return 0;
 }
 /**
  * \brief set the global variables
+ * \test
+ * -# Set parameters for wget_agent
+ * -# Call SetEnv()
+ * -# Check if the parameters get set
  */
 void testSetEnvNormal()
 {

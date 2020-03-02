@@ -21,10 +21,9 @@ with this program; if not, write to the Free Software Foundation, Inc.,
 namespace Fossology\Lib\Dao;
 
 use Fossology\Lib\Db\DbManager;
-use Fossology\Lib\Util\Object;
 use Monolog\Logger;
 
-class TreeDao extends Object
+class TreeDao
 {
   /** @var DbManager */
   private $dbManager;
@@ -34,18 +33,16 @@ class TreeDao extends Object
   public function __construct(DbManager $dbManager)
   {
     $this->dbManager = $dbManager;
-    $this->logger = new Logger(self::className());
+    $this->logger = new Logger(self::class);
   }
 
   public function getFullPath($itemId, $tableName, $parentId=0, $dropArtifactPrefix=false)
   {
     $statementName = __METHOD__.".".$tableName;
 
-    if ($parentId==$itemId)
-    {
+    if ($parentId==$itemId) {
       return $this->getFullPath($itemId, $tableName);
-    }    
-    else if ($parentId > 0) {
+    } else if ($parentId > 0) {
       $params = array($itemId, $parentId);
       $parentClause = " = $2";
       $parentLoopCondition = "AND (ut.parent != $2)";
@@ -98,13 +95,12 @@ class TreeDao extends Object
       throw new \Exception("could not find path of $itemId:\n$sql--".print_r($params,true));
     }
 
-    if(! $dropArtifactPrefix)
-    {
+    if (! $dropArtifactPrefix) {
       return $row['artifact_path_prefix'].$row['file_path'];
-    }else{
+    } else {
       return $row['file_path'];
+    }
   }
-}
 
   public function getMinimalCoveringItem($uploadId, $tableName)
   {
@@ -124,7 +120,7 @@ class TreeDao extends Object
 
      return $row ? $row['uploadtree_pk'] : 0;
   }
-  
+
   /**
    * @param int $uploadtreeId
    * @return array with keys sha1, md5
@@ -135,7 +131,7 @@ class TreeDao extends Object
         array($uploadtreeId), __METHOD__);
     return array('sha1'=>$pfile['pfile_sha1'],'md5'=>$pfile['pfile_md5']);
   }
-  
+
   public function getRepoPathOfPfile($pfileId, $repo="files")
   {
     $pfileRow = $this->dbManager->getSingleRow('SELECT * FROM pfile WHERE pfile_pk=$1',array($pfileId));

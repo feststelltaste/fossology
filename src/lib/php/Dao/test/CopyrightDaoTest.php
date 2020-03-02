@@ -26,14 +26,14 @@ use Fossology\Lib\Db\DbManager;
 use Fossology\Lib\Test\TestPgDb;
 use Mockery as M;
 
-if (!function_exists('Traceback_uri'))
-{
-  function Traceback_uri(){
+if (!function_exists('Traceback_uri')) {
+  function Traceback_uri()
+  {
     return 'Traceback_uri_if_desired';
   }
 }
 
-class CopyrightDaoTest extends \PHPUnit_Framework_TestCase
+class CopyrightDaoTest extends \PHPUnit\Framework\TestCase
 {
   /** @var TestPgDb */
   private $testDb;
@@ -45,7 +45,7 @@ class CopyrightDaoTest extends \PHPUnit_Framework_TestCase
     $this->testDb = new TestPgDb();
     $this->dbManager = $this->testDb->getDbManager();
   }
-  
+
   protected function tearDown()
   {
     $this->testDb = null;
@@ -64,15 +64,15 @@ class CopyrightDaoTest extends \PHPUnit_Framework_TestCase
     $copyrightDao = new CopyrightDao($this->dbManager,$uploadDao);
     $noHighlights = $copyrightDao->getHighlights($uploadTreeId=1);
     assertThat($noHighlights,emptyArray());
-    
+
     $this->testDb->insertData(array('copyright'));
     $highlights = $copyrightDao->getHighlights($uploadTreeId = 1);
     assertThat($highlights,arrayWithSize(1));
     $highlight0 = $highlights[0];
-    assertThat($highlight0,anInstanceOf(Highlight::classname()));
+    assertThat($highlight0,anInstanceOf(Highlight::class));
     $this->assertInstanceOf('Fossology\Lib\Data\Highlight', $highlight0);
     assertThat($highlight0->getEnd(),equalTo(201));
-    
+
     $hilights = $copyrightDao->getHighlights($uploadTreeId=2);
     assertThat($hilights,arrayWithSize(1));
     $hilight0 = $hilights[0];
@@ -106,14 +106,14 @@ class CopyrightDaoTest extends \PHPUnit_Framework_TestCase
     $this->testDb->createInheritedTables(array('uploadtree_a'));
     $this->testDb->insertData(array('copyright','uploadtree_a'));
 
-    $this->testDb->createSequences(array('copyright_ct_pk_seq','copyright_decision_pk_seq'));
+    $this->testDb->createSequences(array('copyright_pk_seq','copyright_decision_pk_seq'));
     $this->testDb->alterTables(array('copyright','copyright_decision'));
   }
 
   private function searchContent($array, $content, $key='content')
   {
-    foreach($array as $entry) {
-      if(array_key_exists($key, $entry)) {
+    foreach ($array as $entry) {
+      if (array_key_exists($key, $entry)) {
         if ($entry[$key] === $content) {
           return true;
         }
@@ -291,32 +291,32 @@ class CopyrightDaoTest extends \PHPUnit_Framework_TestCase
   public function testUpdateTable()
   {
     $this->setUpClearingTables();
-    
+
     $item = new ItemTreeBounds(6,'uploadtree_a',1,17,18);
     $hash2 = '0x3a910990f114f12f';
     $ctPk = 2;
-    
+
     $uploadDao = M::mock('Fossology\Lib\Dao\UploadDao');
     $copyrightDao = new CopyrightDao($this->dbManager,$uploadDao);
     $copyrightDao->updateTable($item, $hash2, $content='foo', $userId=55);
 
-    $updatedCp = $this->dbManager->getSingleRow('SELECT * FROM copyright WHERE ct_pk=$1',array($ctPk),__METHOD__.'.cp');
+    $updatedCp = $this->dbManager->getSingleRow('SELECT * FROM copyright WHERE copyright_pk=$1',array($ctPk),__METHOD__.'.cp');
     assertThat($updatedCp['content'],is(equalTo($content)));
   }
-  
+
   public function testDeleteCopyright()
   {
     $this->setUpClearingTables();
-    
+
     $uploadDao = M::mock('Fossology\Lib\Dao\UploadDao');
-    $copyrightDao = new CopyrightDao($this->dbManager,$uploadDao);    
+    $copyrightDao = new CopyrightDao($this->dbManager,$uploadDao);
     $initialEntries = $copyrightDao->getAllEntries("copyright", 1, "uploadtree_a");
     $initialCount = count($initialEntries);
-    
+
     $item = new ItemTreeBounds(6,'uploadtree_a',1,17,18);
     $hash2 = '0x3a910990f114f12f';
     $copyrightDao->updateTable($item, $hash2, $content='', 55, 'copyright', 'delete');
-    
+
     $remainingEntries = $copyrightDao->getAllEntries("copyright", 1, "uploadtree_a");
     $remainingCount = count($remainingEntries);
     assertThat($remainingCount,is(equalTo($initialCount-1)));

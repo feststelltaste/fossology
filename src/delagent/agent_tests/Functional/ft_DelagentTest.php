@@ -20,10 +20,11 @@ require_once(dirname(dirname(dirname(dirname(__FILE__)))).'/cli/tests/test_commo
 require_once (__DIR__ . "/../../../testing/db/createEmptyTestEnvironment.php");
 
 /**
- * \brief test delagent cli
+ * @class ft_DelagentTest
+ * @brief test delagent cli
  */
 
-class ft_DelagentTest extends PHPUnit_Framework_TestCase {
+class ft_DelagentTest extends \PHPUnit\Framework\TestCase {
 
   public $SYSCONF_DIR;
   public $DB_NAME;
@@ -44,7 +45,6 @@ class ft_DelagentTest extends PHPUnit_Framework_TestCase {
     $command = "cp2foss $auth ../../../pkgagent/agent_tests/testdata/fossology-1.2.0-1.el5.i386.rpm -f $upload_path -d upload_des -q all -v";
     $last = exec("$command 2>&1", $out, $rtn);
     sleep(10);
-    // print_r($out);
     $repo_string = "Uploading to folder: '/$upload_path'";
     $repo_pos = strpos($out[7], $repo_string);
     $output_msg_count = count($out);
@@ -69,7 +69,9 @@ class ft_DelagentTest extends PHPUnit_Framework_TestCase {
     /** get upload id that you just upload for testing */
     if ($out && $out[11]) {
       $upload_id = get_upload_id($out[11]);
-    } else $this->assertFalse(TRUE);
+    } else { 
+      $this->assertFalse(true);
+    }
     $agent_status = 0;
     $agent_status = check_agent_status("ununpack", $upload_id);
     $this->assertEquals(1, $agent_status);
@@ -105,7 +107,11 @@ class ft_DelagentTest extends PHPUnit_Framework_TestCase {
   }
 
   /**
-   * \brief test delagent -u
+   * @brief test delagent -u
+   * @test
+   * -# Get the Upload id and filename for a upload.
+   * -# Call delagent cli with `-u` flag
+   * -# Check if the upload id and filename matches.
    */
   function test_delagentu(){
     global $EXE_PATH;
@@ -120,7 +126,7 @@ class ft_DelagentTest extends PHPUnit_Framework_TestCase {
       $expected = $row["upload_pk"] . " :: ". $row["upload_filename"];
     }
     pg_free_result($result);
-    /** the file is one executable file */
+    /* the file is one executable file */
     $command = "$EXE_PATH -u -n fossy -p fossy";
     exec($command, $out, $rtn);
     //print_r($out);
@@ -128,7 +134,11 @@ class ft_DelagentTest extends PHPUnit_Framework_TestCase {
   }
 
   /**
-   * \brief test delagent -u with wrong user
+   * @brief test delagent -u with wrong user
+   * @test
+   * -# Get the Upload id and filename for a upload.
+   * -# Call delagent cli with `-u` flag but wrong user
+   * -# Check that upload id and filename should not match.
    */
   function test_delagentu_wronguser(){
     global $EXE_PATH;
@@ -144,7 +154,7 @@ class ft_DelagentTest extends PHPUnit_Framework_TestCase {
       $expected = $row["upload_pk"] . " :: ". $row["upload_filename"];
     }
     pg_free_result($result);
-    /** the file is one executable file */
+    /* the file is one executable file */
     $command = "$EXE_PATH -u -n testuser -p testuser";
     exec($command, $out, $rtn);
     //print_r($out);
@@ -162,4 +172,4 @@ class ft_DelagentTest extends PHPUnit_Framework_TestCase {
 
 }
 
-?>
+

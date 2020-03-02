@@ -23,7 +23,7 @@ namespace Fossology\Lib\Dao;
 use Fossology\Lib\Db\DbManager;
 use Fossology\Lib\Test\TestPgDb;
 
-class TreeDaoTest extends \PHPUnit_Framework_TestCase
+class TreeDaoTest extends \PHPUnit\Framework\TestCase
 {
   /** @var TestPgDb */
   private $testDb;
@@ -42,8 +42,7 @@ class TreeDaoTest extends \PHPUnit_Framework_TestCase
     $this->dbManager->prepare($stmt = 'insert.upload',
         "INSERT INTO upload (upload_pk, uploadtree_tablename) VALUES ($1, $2)");
     $uploadArray = array(array(1, 'uploadtree'), array(32, 'uploadtree'));
-    foreach ($uploadArray as $uploadEntry)
-    {
+    foreach ($uploadArray as $uploadEntry) {
       $this->dbManager->freeResult($this->dbManager->execute($stmt, $uploadEntry));
     }
     $this->treeDao = new TreeDao($this->dbManager);
@@ -53,22 +52,22 @@ class TreeDaoTest extends \PHPUnit_Framework_TestCase
   protected function tearDown()
   {
     $this->addToAssertionCount(\Hamcrest\MatcherAssert::getCount()-$this->assertCountBefore);
-        
+
     $this->testDb = null;
     $this->dbManager = null;
   }
-  
+
   public function testGetMinimalCoveringItem()
   {
     $this->prepareModularTable(array());
     $coverContainer = $this->treeDao->getMinimalCoveringItem(1, "uploadtree");
     assertThat($coverContainer,equalTo(5));
-    
+
     $this->prepareUploadTree(array(array($item=99,null,$upload=32,88,0x0,1,2,'plainFile',null)));
     $coverSelf = $this->treeDao->getMinimalCoveringItem($upload, "uploadtree");
     assertThat($coverSelf,equalTo($item));
   }
-  
+
   public function testGetFullPathFromSingleFolderUpload()
   {
     $this->prepareModularTable(array(array(6,5,1,0,0,5,6,$fName="file",5)));
@@ -121,8 +120,7 @@ class TreeDaoTest extends \PHPUnit_Framework_TestCase
   {
     $this->dbManager->prepare($stmt = 'insert.uploadtree',
         "INSERT INTO uploadtree (uploadtree_pk, parent, upload_fk, pfile_fk, ufile_mode, lft, rgt, ufile_name, realparent) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)");
-    foreach ($uploadTreeArray as $uploadTreeEntry)
-    {
+    foreach ($uploadTreeArray as $uploadTreeEntry) {
       $this->dbManager->freeResult($this->dbManager->execute($stmt, $uploadTreeEntry));
     }
   }
@@ -257,7 +255,7 @@ class TreeDaoTest extends \PHPUnit_Framework_TestCase
     assertThat($this->treeDao->getFullPath(3665, "uploadtree"),        equalTo("uploadDaoTest.tar/uploadDaoTest/L/L2/L2a"));
     assertThat($this->treeDao->getFullPath(3665, "uploadtree",0,true), equalTo(                  "uploadDaoTest/L/L2/L2a"));
   }
-  
+
   public function testGetUploadHashes()
   {
     $this->testDb->createPlainTables(array('pfile'));
@@ -318,5 +316,4 @@ class TreeDaoTest extends \PHPUnit_Framework_TestCase
     assertThat($this->treeDao->getFullPath(12, "uploadtree", 7),      equalTo('subExample.tar/subExample/innerFile'));
     assertThat($this->treeDao->getFullPath(12, "uploadtree", 7,true), equalTo(               'subExample/innerFile'));
   }
-
 }

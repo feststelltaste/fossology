@@ -26,7 +26,7 @@ with this program; if not, write to the Free Software Foundation, Inc.,
 #include "testRun.h"
 
 /**
- * \file testRun.c
+ * \file
  * \brief main function for in this testing module
  */
 
@@ -34,6 +34,10 @@ char *DBConfFile = NULL;
 
 extern CU_SuiteInfo suites[];
 
+/**
+ * \brief Helper function to get db owner
+ * \return Owner of the database
+ */
 char* getUser()
 {
   char CMD[200], *user;
@@ -59,6 +63,7 @@ char* getUser()
 
 /**
  * \brief initialize db
+ * \return 0 on success, -1 otherwise
  */
 int DelagentDBInit()
 {
@@ -67,6 +72,8 @@ int DelagentDBInit()
 
   char cwd[2048];
   char* confDir = NULL;
+  char* user = NULL;
+  char* db_name = NULL;
 
   if(getcwd(cwd, sizeof(cwd)) != NULL)
   {
@@ -81,10 +88,16 @@ int DelagentDBInit()
     return -1;
   }
   DBConfFile = get_dbconf();
+  user = getUser();
+  db_name = get_db_name();
 
   memset(CMD, '\0', sizeof(CMD));
-  sprintf(CMD, "gunzip -c ../testdata/testdb_all.gz | psql -U %s -d %s >/dev/null", getUser(), get_db_name());
+  sprintf(CMD, "gunzip -c ../testdata/testdb_all.gz | psql -U %s -d %s >/dev/null", user, db_name);
   rc = system(CMD);
+  if (user != NULL)
+  {
+    free(user);
+  }
   if (WEXITSTATUS(rc) != 0)
   {
     printf("Database initialize ERROR!\n");
@@ -105,6 +118,7 @@ int DelagentClean()
 
 /**
  * \brief init db and repo
+ * \return 0 on success, -1 otherwise
  */
 int DelagentInit()
 {

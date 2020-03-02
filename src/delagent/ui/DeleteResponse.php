@@ -15,18 +15,27 @@ with this program; if not, write to the Free Software Foundation, Inc.,
 
 namespace Fossology\DelAgent\UI;
 
+/**
+ * @class DeleteResponse
+ * @brief Handle response from delagent
+ */
 class DeleteResponse
 {
   /**
-   * @var $deleteMessageCode DeleteMessages
+   * @var DeleteMessages $deleteMessageCode
+   * Messages from delagent
    */
   private $deleteMessageCode;
+  /**
+   * @var string $additionalMessage
+   * Additional messages for user
+   */
   private $additionalMessage;
 
   /**
    * DeleteResponse constructor.
-   * @param $deleteMessage int
-   * @param $additionalMessage
+   * @param DeleteMessages|int $deleteMessage
+   * @param string $additionalMessage
    */
   public function __construct($deleteMessage, $additionalMessage = "")
   {
@@ -43,16 +52,20 @@ class DeleteResponse
   }
 
   /**
+   * @brief Translates message code to strings
    * @return string
    */
   public function getDeleteMessageString()
   {
-    switch ($this->getDeleteMessageCode())
-    {
-      case 0: return "You dont have permissions to delete the upload";
-      case 1: return "Deletion Scheduling failed";
-      case 2: return "Deletion added to job queue";
-      default: return "Invalid Error";
+    switch ($this->getDeleteMessageCode()) {
+      case 1:
+        return "Deletion Scheduling failed";
+      case 2:
+        return "Deletion added to job queue";
+      case 3:
+        return "You don't have permissions to delete the upload";
+      default:
+        return "Invalid Error";
     }
   }
 
@@ -63,5 +76,4 @@ class DeleteResponse
   {
     return $this->additionalMessage;
   }
-
 }

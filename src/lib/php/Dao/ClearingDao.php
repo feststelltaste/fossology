@@ -1,6 +1,6 @@
 <?php
 /*
-Copyright (C) 2014-2018, Siemens AG
+Copyright (C) 2014-2018,2020, Siemens AG
 Author: Johannes Najjar
 
 This program is free software; you can redistribute it and/or
@@ -30,10 +30,11 @@ use Fossology\Lib\Data\LicenseRef;
 use Fossology\Lib\Data\Tree\ItemTreeBounds;
 use Fossology\Lib\Db\DbManager;
 use Fossology\Lib\Proxy\UploadTreeProxy;
-use Fossology\Lib\Util\Object;
+use Fossology\Lib\Proxy\ScanJobProxy;
 use Monolog\Logger;
+use Fossology\Lib\Data\AgentRef;
 
-class ClearingDao extends Object
+class ClearingDao
 {
   /** @var DbManager */
   private $dbManager;
@@ -51,7 +52,7 @@ class ClearingDao extends Object
   function __construct(DbManager $dbManager, UploadDao $uploadDao)
   {
     $this->dbManager = $dbManager;
-    $this->logger = new Logger(self::className());
+    $this->logger = new Logger(self::class);
     $this->uploadDao = $uploadDao;
     $this->licenseRefCache = array();
   }
@@ -64,13 +65,11 @@ class ClearingDao extends Object
     $params[] = $groupId; $p2 = "$". count($params);
 
     $sql_upload = "";
-    if ('uploadtree' === $uploadTreeTable || 'uploadtree_a' === $uploadTreeTable)
-    {
+    if ('uploadtree' === $uploadTreeTable || 'uploadtree_a' === $uploadTreeTable) {
       $params[] = $itemTreeBounds->getUploadId(); $p = "$". count($params);
       $sql_upload = "ut.upload_fk=$p AND ";
     }
-    if (!empty($condition))
-    {
+    if (!empty($condition)) {
       $statementName .= ".(".$condition.")";
       $condition .= " AND ";
     }
@@ -80,6 +79,7 @@ class ClearingDao extends Object
     $statementName .= "." . $uploadTreeTable . ($onlyCurrent ? ".current": "");
 
     $globalScope = DecisionScopes::REPO;
+    $localScope = DecisionScopes::ITEM;
 
     return "WITH allDecs AS (
               SELECT
@@ -93,9 +93,11 @@ class ClearingDao extends Object
                 CASE cd.scope WHEN $globalScope THEN 1 ELSE 0 END AS scopesort
               FROM clearing_decision cd
                 INNER JOIN $uploadTreeTable ut
-                  ON ut.pfile_fk = cd.pfile_fk AND cd.scope = $globalScope   OR ut.uploadtree_pk = cd.uploadtree_fk
+                  ON (ut.pfile_fk = cd.pfile_fk AND cd.scope = $globalScope)
+                    OR (ut.uploadtree_pk = cd.uploadtree_fk
+                      AND cd.scope = $localScope AND cd.group_fk = $p2)
               WHERE $sql_upload $condition
-                cd.decision_type!=$p1 AND cd.group_fk = $p2),
+                cd.decision_type!=$p1),
             decision AS (
               SELECT $filterClause *
               FROM allDecs
@@ -134,8 +136,7 @@ class ClearingDao extends Object
     $res = $this->dbManager->execute($statementName, $params);
 
     $licenses = array();
-    while ($row = $this->dbManager->fetchArray($res))
-    {
+    while ($row = $this->dbManager->fetchArray($res)) {
       $licenses[] = new LicenseRef($row['license_id'], $row['shortname'], $row['fullname']);
     }
     $this->dbManager->freeResult($res);
@@ -180,12 +181,10 @@ class ClearingDao extends Object
 
     $statementName = __METHOD__;
 
-    if (!$includeSubFolders)
-    {
+    if (!$includeSubFolders) {
       $params = array($itemTreeBounds->getItemId());
       $condition = "ut.realparent = $1";
-    }
-    else {
+    } else {
       $params = array($itemTreeBounds->getLeft(), $itemTreeBounds->getRight());
       $condition = "ut.lft BETWEEN $1 AND $2";
     }
@@ -204,7 +203,8 @@ class ClearingDao extends Object
    * @param array $params
    * @return ClearingDecision[]
    */
-  private function getDecisionsFromCte($decisionsCte, $statementName, $params, $forClearingHistory=false) {
+  private function getDecisionsFromCte($decisionsCte, $statementName, $params, $forClearingHistory=false)
+  {
     $sql = "$decisionsCte
             SELECT
               decision.*,
@@ -238,8 +238,7 @@ class ClearingDao extends Object
     $clearingEventCache = array();
     $clearingDecisionBuilder = ClearingDecisionBuilder::create();
     $firstMatch = true;
-    while ($row = $this->dbManager->fetchArray($result))
-    {
+    while ($row = $this->dbManager->fetchArray($result)) {
       $clearingId = $row['id'];
       $itemId = $row['itemid'];
       $licenseId = $row['license_id'];
@@ -255,20 +254,17 @@ class ClearingDao extends Object
       $reportInfo = $row['reportinfo'];
       $acknowledgement = $row['acknowledgement'];
 
-      if ($clearingId !== $previousClearingId && $itemId !== $previousItemId)
-      {
+      if ($clearingId !== $previousClearingId && $itemId !== $previousItemId) {
         //store the old one
-        if (!$firstMatch)
-        {
+        if (!$firstMatch) {
           $clearingsWithLicensesArray[] = $clearingDecisionBuilder->setClearingEvents($clearingEvents)->build();
         }
 
         $firstMatch = false;
         //prepare the new one
-        if($forClearingHistory){
+        if ($forClearingHistory) {
           $previousClearingId = $clearingId;
-        }
-        else{
+        } else {
           $previousItemId = $itemId;
         }
         $clearingEvents = array();
@@ -283,8 +279,7 @@ class ClearingDao extends Object
             ->setTimeStamp($row['ts_added']);
       }
 
-      if ($licenseId !== null)
-      {
+      if ($licenseId !== null) {
         if (!array_key_exists($eventId, $clearingEventCache)) {
           if (!array_key_exists($licenseId, $this->licenseRefCache)) {
             $this->licenseRefCache[$licenseId] = new LicenseRef($licenseId, $licenseShortName, $licenseName);
@@ -297,8 +292,7 @@ class ClearingDao extends Object
     }
 
     //! Add the last match
-    if (!$firstMatch)
-    {
+    if (!$firstMatch) {
       $clearingsWithLicensesArray[] = $clearingDecisionBuilder->setClearingEvents($clearingEvents)->build();
     }
     $this->dbManager->freeResult($result);
@@ -313,8 +307,7 @@ class ClearingDao extends Object
   public function getRelevantClearingDecision(ItemTreeBounds $itemTreeBounds, $groupId)
   {
     $clearingDecisions = $this->getFileClearings($itemTreeBounds, $groupId);
-    if (count($clearingDecisions) > 0)
-    {
+    if (count($clearingDecisions) > 0) {
       return $clearingDecisions[0];
     }
     return null;
@@ -373,8 +366,7 @@ INSERT INTO clearing_decision (
       "INSERT INTO clearing_decision_event (clearing_decision_fk, clearing_event_fk) VALUES($1, $2)"
     );
 
-    foreach ($eventIds as $eventId)
-    {
+    foreach ($eventIds as $eventId) {
       $this->dbManager->freeResult($this->dbManager->execute($statementNameClearingDecisionEventInsert, array($clearingDecisionId, $eventId)));
     }
 
@@ -392,10 +384,8 @@ INSERT INTO clearing_decision (
     $events = array();
     $date = 0;
 
-    if(count($decision))
-    {
-      foreach ($decision[0]->getClearingEvents() as $event)
-      {
+    if (count($decision)) {
+      foreach ($decision[0]->getClearingEvents() as $event) {
         $events[$event->getLicenseId()] = $event;
       }
       $date = $decision[0]->getTimeStamp();
@@ -409,7 +399,7 @@ INSERT INTO clearing_decision (
     $this->dbManager->prepare($stmt, $sql);
     $res = $this->dbManager->execute($stmt,array($itemTreeBounds->getItemId(),$groupId,$date));
 
-    while($row = $this->dbManager->fetchArray($res)){
+    while ($row = $this->dbManager->fetchArray($res)) {
       $licenseRef = new LicenseRef($row['rf_fk'],$row['rf_shortname'],$row['rf_fullname']);
       $events[$row['rf_fk']] = ClearingEventBuilder::create()
               ->setEventId($row['clearing_event_pk'])
@@ -444,8 +434,7 @@ INSERT INTO clearing_decision (
     $params = array($uploadTreeId, $licenseId, $groupId);
     $row = $this->dbManager->getSingleRow($statementGetOldata, $params, $statementName);
 
-    if (!$row)
-    {  //The license was not added as user decision yet -> we promote it here
+    if (!$row) {  //The license was not added as user decision yet -> we promote it here
       $type = ClearingEventTypes::USER;
       $row['type_fk'] = $type;
       $row['comment'] = "";
@@ -453,17 +442,15 @@ INSERT INTO clearing_decision (
       $row['acknowledgement'] = "";
     }
 
-    if ($what == 'reportinfo')
-    {
+    if ($what == 'reportinfo') {
       $reportInfo = $changeTo;
       $comment = $row['comment'];
       $acknowledgement = $row['acknowledgement'];
-    } elseif($what == 'comment')
-    {
+    } elseif ($what == 'comment') {
       $reportInfo = $row['reportinfo'];
       $comment = $changeTo;
       $acknowledgement = $row['acknowledgement'];
-    } else{
+    } else {
       $reportInfo = $row['reportinfo'];
       $comment = $row['comment'];
       $acknowledgement = $changeTo;
@@ -474,7 +461,8 @@ INSERT INTO clearing_decision (
 
   }
 
-  public function copyEventIdTo($eventId, $itemId, $userId, $groupId) {
+  public function copyEventIdTo($eventId, $itemId, $userId, $groupId)
+  {
     $stmt = __METHOD__;
     $this->dbManager->prepare($stmt,
       "INSERT INTO clearing_event(uploadtree_fk, user_fk, group_fk, type_fk, rf_fk, removed, reportinfo, comment)
@@ -505,15 +493,12 @@ INSERT INTO clearing_decision (
     $columns = "uploadtree_fk, user_fk, group_fk, type_fk, rf_fk, removed, reportinfo, comment, acknowledgement";
     $values = "$1,$2,$3,$4,$5,$6,$7,$8,$9";
 
-    if ($jobId>0)
-    {
+    if ($jobId > 0) {
       $stmt.= ".jobId";
       $params[] = $jobId;
       $columns .= ", job_fk";
       $values .= ",$".count($params);
-    }
-    else
-    {
+    } else {
       $this->markDecisionAsWip($uploadTreeId, $userId, $groupId);
     }
 
@@ -541,8 +526,7 @@ INSERT INTO clearing_decision (
     $res = $this->dbManager->execute($statementName, array($jobId));
 
     $events = array();
-    while ($row = $this->dbManager->fetchArray($res))
-    {
+    while ($row = $this->dbManager->fetchArray($res)) {
       $itemId = intval($row['uploadtree_fk']);
       $eventId = intval($row['clearing_event_pk']);
       $licenseId = intval($row['rf_fk']);
@@ -602,9 +586,9 @@ INSERT INTO clearing_decision (
   public function isDecisionWip($uploadTreeId, $groupId)
   {
     $sql = "SELECT decision_type FROM clearing_decision WHERE uploadtree_fk=$1 AND group_fk = $2 ORDER BY date_added DESC LIMIT 1";
-    $latestDec = $this->dbManager->getSingleRow($sql, array($uploadTreeId, $groupId), $sqlLog = __METHOD__);
-    if ($latestDec === false)
-    {
+    $latestDec = $this->dbManager->getSingleRow($sql,
+                 array($uploadTreeId, $groupId), $sqlLog = __METHOD__);
+    if ($latestDec === false) {
       return false;
     }
     return ($latestDec['decision_type'] == DecisionTypes::WIP);
@@ -613,14 +597,26 @@ INSERT INTO clearing_decision (
   public function isDecisionTBD($uploadTreeId, $groupId)
   {
     $sql = "SELECT decision_type FROM clearing_decision WHERE uploadtree_fk=$1 AND group_fk = $2 ORDER BY date_added DESC LIMIT 1";
-    $latestDec = $this->dbManager->getSingleRow($sql, array($uploadTreeId, $groupId), $sqlLog = __METHOD__);
-    if ($latestDec === false)
-    {
+    $latestDec = $this->dbManager->getSingleRow($sql,
+                 array($uploadTreeId, $groupId), $sqlLog = __METHOD__);
+    if ($latestDec === false) {
       return false;
     }
     return ($latestDec['decision_type'] == DecisionTypes::TO_BE_DISCUSSED);
   }
 
+  public function isDecisionDNU($uploadTreeId, $groupId)
+  {
+    $sql = "SELECT decision_type FROM clearing_decision
+              WHERE uploadtree_fk=$1 AND group_fk = $2
+            ORDER BY clearing_decision_pk DESC LIMIT 1";
+    $latestDec = $this->dbManager->getSingleRow($sql,
+                 array($uploadTreeId, $groupId), $sqlLog = __METHOD__);
+    if ($latestDec === false) {
+      return false;
+    }
+    return ($latestDec['decision_type'] == DecisionTypes::DO_NOT_USE);
+  }
 
   /**
    * @param ItemTreeBounds $itemTreeBound
@@ -640,8 +636,7 @@ INSERT INTO clearing_decision (
 
     $triedExpr = "$3 between ut2.lft and ut2.rgt";
     $triedFilter = "";
-    if ($onlyTried)
-    {
+    if ($onlyTried) {
       $triedFilter = "and " . $triedExpr;
       $stmt .= ".tried";
     }
@@ -674,11 +669,9 @@ INSERT INTO clearing_decision (
     $res = $this->dbManager->execute($stmt, $params);
 
     $bulks = array();
-    while ($row = $this->dbManager->fetchArray($res))
-    {
+    while ($row = $this->dbManager->fetchArray($res)) {
       $bulkRun = $row['lrb_pk'];
-      if (!array_key_exists($bulkRun, $bulks))
-      {
+      if (!array_key_exists($bulkRun, $bulks)) {
         $bulks[$bulkRun] = array(
             "bulkId" => $row['lrb_pk'],
             "id" => $row['ce_pk'],
@@ -743,7 +736,7 @@ INSERT INTO clearing_decision (
     $this->dbManager->prepare($statementName, $sql);
     $res = $this->dbManager->execute($statementName, $params);
     $multiplicity = array();
-    while($row = $this->dbManager->fetchArray($res)){
+    while ($row = $this->dbManager->fetchArray($res)) {
       $shortname= empty($row['rf_pk']) ? LicenseDao::NO_LICENSE_FOUND : $row['shortname'];
       $multiplicity[$shortname] = $row;
     }
@@ -757,10 +750,15 @@ INSERT INTO clearing_decision (
    * @param int $groupId
    * @param int $userId
    */
-  public function markDirectoryAsIrrelevant(ItemTreeBounds $itemTreeBounds,$groupId,$userId)
+  public function markDirectoryAsDecisionType(ItemTreeBounds $itemTreeBounds, $groupId, $userId, $decisionMark)
   {
-    $this->markDirectoryAsIrrelevantIfScannerDetected($itemTreeBounds, $groupId, $userId);
-    $this->markDirectoryAsIrrelevantIfUserEdited($itemTreeBounds, $groupId, $userId);
+    if ($decisionMark == "doNotUse") {
+      $decisionMark = DecisionTypes::DO_NOT_USE;
+    } else {
+      $decisionMark = DecisionTypes::IRRELEVANT;
+    }
+    $this->markDirectoryAsDecisionTypeIfScannerDetected($itemTreeBounds, $groupId, $userId, false, $decisionMark);
+    $this->markDirectoryAsDecisionTypeIfUserEdited($itemTreeBounds, $groupId, $userId, false, $decisionMark);
   }
 
   /**
@@ -768,10 +766,15 @@ INSERT INTO clearing_decision (
    * @param int $groupId
    * @param int $userId
    */
-  public function deleteIrrelevantDecisionsFromDirectory(ItemTreeBounds $itemTreeBounds,$groupId,$userId)
+  public function deleteDecisionTypeFromDirectory(ItemTreeBounds $itemTreeBounds, $groupId, $userId, $decisionMark)
   {
-    $this->markDirectoryAsIrrelevantIfScannerDetected($itemTreeBounds, $groupId, $userId, true);
-    $this->markDirectoryAsIrrelevantIfUserEdited($itemTreeBounds, $groupId, $userId, true);
+    if ($decisionMark == "deleteDoNotUse") {
+      $decisionMark = DecisionTypes::DO_NOT_USE;
+    } else {
+      $decisionMark = DecisionTypes::IRRELEVANT;
+    }
+    $this->markDirectoryAsDecisionTypeIfScannerDetected($itemTreeBounds, $groupId, $userId, true, $decisionMark);
+    $this->markDirectoryAsDecisionTypeIfUserEdited($itemTreeBounds, $groupId, $userId, true, $decisionMark);
   }
 
   /**
@@ -779,7 +782,7 @@ INSERT INTO clearing_decision (
    * @param int $groupId
    * @param int $userId
    */
-  protected function markDirectoryAsIrrelevantIfScannerDetected(ItemTreeBounds $itemTreeBounds,$groupId,$userId,$removeDecision=false)
+  protected function markDirectoryAsDecisionTypeIfScannerDetected(ItemTreeBounds $itemTreeBounds, $groupId, $userId, $removeDecision=false, $decisionMark=DecisionTypes::IRRELEVANT)
   {
     $statementName = __METHOD__ ;
     $params = array($itemTreeBounds->getLeft(), $itemTreeBounds->getRight());
@@ -789,9 +792,9 @@ INSERT INTO clearing_decision (
                      UploadTreeProxy::OPT_ITEM_FILTER=>' AND (lft BETWEEN $1 AND $2)',
                      UploadTreeProxy::OPT_GROUP_ID=>'$'.$a.'');
     $uploadTreeProxy = new UploadTreeProxy($itemTreeBounds->getUploadId(), $options, $itemTreeBounds->getUploadTreeTableName());
-    if(!$removeDecision) {
+    if (!$removeDecision) {
       $params[] = $userId;
-      $params[] = DecisionTypes::IRRELEVANT;
+      $params[] = $decisionMark;
       $params[] = DecisionScopes::ITEM;
       $sql = $uploadTreeProxy->asCte()
           .' INSERT INTO clearing_decision (uploadtree_fk,pfile_fk,user_fk,group_fk,decision_type,scope)
@@ -800,7 +803,7 @@ INSERT INTO clearing_decision (
              SELECT uploadtree_fk FROM clearing_decision
               WHERE decision_type=$'.($a+2).' AND uploadtree_fk=UploadTreeView.uploadtree_pk)';
     } else {
-      $params[] = DecisionTypes::IRRELEVANT;
+      $params[] = $decisionMark;
       $sql = $uploadTreeProxy->asCte()
           .' DELETE FROM clearing_decision WHERE clearing_decision_pk IN (
              SELECT clearing_decision_pk
@@ -820,24 +823,24 @@ INSERT INTO clearing_decision (
    * @param int $groupId
    * @param int $userId
    */
-  protected function markDirectoryAsIrrelevantIfUserEdited(ItemTreeBounds $itemTreeBounds,$groupId,$userId,$removeDecision=false)
+  protected function markDirectoryAsDecisionTypeIfUserEdited(ItemTreeBounds $itemTreeBounds, $groupId, $userId, $removeDecision=false, $decisionMark=DecisionTypes::IRRELEVANT)
   {
     $statementName = __METHOD__ ;
     $params = array($itemTreeBounds->getLeft(), $itemTreeBounds->getRight());
     $condition = "ut.lft BETWEEN $1 AND $2";
     $decisionsCte = $this->getRelevantDecisionsCte($itemTreeBounds, $groupId, $onlyCurrent=true, $statementName, $params, $condition);
-    if(!$removeDecision) {
+    if (!$removeDecision) {
       $params[] = $userId;
       $a = count($params);
       $params[] = $groupId;
-      $params[] = DecisionTypes::IRRELEVANT;
+      $params[] = $decisionMark;
       $params[] = DecisionScopes::ITEM;
       $this->dbManager->prepare($statementName, $decisionsCte
           .' INSERT INTO clearing_decision (uploadtree_fk,pfile_fk,user_fk,group_fk,decision_type,scope)
              SELECT itemid,pfile_id, $'.$a.', $'.($a+1).', $'.($a+2).', $'.($a+3).'
                FROM allDecs ad WHERE type_id != $'.($a+2));
     } else {
-      $params[] = DecisionTypes::IRRELEVANT;
+      $params[] = $decisionMark;
       $a = count($params);
       $this->dbManager->prepare($statementName, $decisionsCte
           .' DELETE FROM clearing_decision WHERE decision_type = $'.$a.'
@@ -895,12 +898,17 @@ INSERT INTO clearing_decision (
    * @param bool $onlyCurrent
    * @return ClearingDecision[]
    */
-  function getIrrelevantFilesFolder(ItemTreeBounds $itemTreeBounds, $groupId, $onlyCurrent=true)
+  function getFilesForDecisionTypeFolderLevel(ItemTreeBounds $itemTreeBounds, $groupId, $onlyCurrent=true, $decisionMark="")
   {
+    if (!empty($decisionMark)) {
+      $decisionMark = DecisionTypes::DO_NOT_USE;
+    } else {
+      $decisionMark = DecisionTypes::IRRELEVANT;
+    }
     $statementName = __METHOD__;
     $params = array();
     $decisionsCte = $this->getRelevantDecisionsCte($itemTreeBounds, $groupId, $onlyCurrent, $statementName, $params);
-    $params[] = DecisionTypes::IRRELEVANT;
+    $params[] = $decisionMark;
     $sql = "$decisionsCte
             SELECT
 	    itemid as uploadtree_pk,
@@ -934,15 +942,84 @@ INSERT INTO clearing_decision (
              AND job_upload_fk=reused_upload_fk AND job_group_fk=reused_group_fk";
     $this->dbManager->prepare($stmt, $sql);
     $res = $this->dbManager->execute($stmt,array($uploadId, $groupId, $userId,'monkbulk'));
-    while($row=  $this->dbManager->fetchArray($res))
-    {
+    while ($row=  $this->dbManager->fetchArray($res)) {
       $bulkIds = array_merge($bulkIds,explode("\n", $row['jq_args']));
     }
     $this->dbManager->freeResult($res);
-    if(empty($onlyCount)) {
+    if (empty($onlyCount)) {
       return array_unique($bulkIds);
     } else {
       return count(array_unique($bulkIds));
     }
+  }
+
+  /**
+   * Get the count of items cleared for the given upload from
+   * clearing_decision table.
+   * @param integer $uploadId Upload id
+   * @param integer $groupId  Group id for the decisions
+   * @return integer Number of items cleared.
+   */
+  public function getClearingDecisionsCount($uploadId, $groupId)
+  {
+    $itemTreeBounds = $this->uploadDao->getParentItemBounds($uploadId);
+    $statementName = "";
+    $params = array();
+
+    $cte = $this->getRelevantDecisionsCte($itemTreeBounds, $groupId, true,
+      $statementName, $params);
+
+    $statementName = __METHOD__ . $statementName;
+    $sql = "$cte SELECT COUNT(*) AS cnt FROM decision;";
+
+    $clearedCounter = $this->dbManager->getSingleRow($sql, $params,
+      $statementName);
+    return $clearedCounter['cnt'];
+  }
+
+  /**
+   * Get the count of items with either agent license finding or user license
+   * finding.
+   * @param integer $uploadId Upload id
+   * @param integer $groupId  Group id
+   * @return integer Number of items with license findings.
+   */
+  public function getTotalDecisionCount($uploadId, $groupId)
+  {
+    $uploadTreeTable = $this->uploadDao->getUploadtreeTableName($uploadId);
+    $scanJobProxy = new ScanJobProxy($GLOBALS['container']->get('dao.agent'), $uploadId);
+    $scanJobProxy->createAgentStatus(array_keys(AgentRef::AGENT_LIST));
+    $latestAgentIds = $scanJobProxy->getLatestSuccessfulAgentIds();
+    $agentIds = "{" . implode(",", $latestAgentIds) . "}";
+
+    $globalScope = DecisionScopes::REPO;
+    $params = array($groupId, $uploadId, $agentIds);
+    $statement = __METHOD__ . "." . $uploadTreeTable;
+    $sql = "
+WITH allDecs AS (
+  SELECT DISTINCT ON (ut.uploadtree_pk) * FROM $uploadTreeTable AS ut
+    LEFT JOIN license_file AS lf
+      ON lf.pfile_fk = ut.pfile_fk
+      AND lf.agent_fk = ANY($3::int[])
+      AND lf.rf_fk NOT IN (SELECT rf_pk FROM license_ref
+        WHERE rf_shortname = ANY(VALUES('No_license_found'),('Void'))
+      )
+      AND lf.rf_fk IS NOT NULL
+    LEFT JOIN clearing_decision AS cd ON
+      (ut.uploadtree_pk = cd.uploadtree_fk)
+      OR (ut.pfile_fk = cd.pfile_fk AND cd.scope = $globalScope)
+      AND cd.group_fk = $1
+  WHERE ut.upload_fk = $2 AND (
+    CASE
+      WHEN lf.fl_pk IS NULL AND cd.clearing_decision_pk IS NULL
+        THEN FALSE
+        ELSE TRUE
+      END
+  )
+)
+SELECT count(*) AS cnt
+FROM (SELECT DISTINCT uploadtree_pk FROM allDecs) AS no_license_uploadtree;";
+    $foundCounter = $this->dbManager->getSingleRow($sql, $params, $statement);
+    return $foundCounter['cnt'];
   }
 }

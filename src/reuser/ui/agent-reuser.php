@@ -16,6 +16,12 @@
  * 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  ***********************************************************/
 
+/**
+ * @dir
+ * @brief UI element of reuser agent
+ * @file
+ */
+
 namespace Fossology\Reuser;
 
 use Fossology\Lib\Auth\Auth;
@@ -25,14 +31,23 @@ use Fossology\Lib\Plugin\AgentPlugin;
 use Fossology\Lib\Util\StringOperation;
 use Symfony\Component\HttpFoundation\Request;
 
+include_once(dirname(__DIR__) . "/agent/version.php");
+
+/**
+ * @class ReuserAgentPlugin
+ * @brief UI element for reuser during Uploading new package
+ */
 class ReuserAgentPlugin extends AgentPlugin
 {
-  const UPLOAD_TO_REUSE_SELECTOR_NAME = 'uploadToReuse';
+  const UPLOAD_TO_REUSE_SELECTOR_NAME = 'uploadToReuse';  ///< Form element name for main license to reuse
 
-  /** @var UploadDao */
+  /** @var UploadDao $uploadDao
+   * Upload Dao object
+   */
   private $uploadDao;
 
-  public function __construct() {
+  public function __construct()
+  {
     $this->Name = "agent_reuser";
     $this->Title =  _("Reuse of License Clearing");
     $this->AgentName = "reuser";
@@ -42,78 +57,87 @@ class ReuserAgentPlugin extends AgentPlugin
     $this->uploadDao = $GLOBALS['container']->get('dao.upload');
   }
 
-  public function doAgentAdd($jobId, $uploadId, &$errorMsg, $dependencies, $jqargs = "", $jq_cmd_args = null)
-  {
-    parent::doAgentAdd($jobId, $uploadId, $errorMsg, $dependencies, $jqargs, $jq_cmd_args);
-  }
-
   /**
-   * @param array $vars
-   * @return string
+   * @brief Render twig templates for plugin_reuser
+   * @param array $vars Variables for twig template
+   * @return string Rendered HTML
    */
-  public function renderContent(&$vars) {
+  public function renderContent(&$vars)
+  {
     $reuserPlugin = plugin_find('plugin_reuser');
     return $reuserPlugin->renderContent($vars);
   }
 
   /**
-   * @param array $vars
-   * @return string
+   * @brief Render footer twig templates for plugin_reuser
+   * @param array $vars Variables for twig template
+   * @return string Rendered HTML
    */
-  public function renderFoot(&$vars) {
+  public function renderFoot(&$vars)
+  {
     $reuserPlugin = plugin_find('plugin_reuser');
     return $reuserPlugin->renderFoot($vars);
   }
 
-
+  /**
+   * @copydoc Fossology::Lib::Plugin::AgentPlugin::preInstall()
+   * @see Fossology::Lib::Plugin::AgentPlugin::preInstall()
+   */
   public function preInstall()
   {
     menu_insert("ParmAgents::" . $this->Title, 0, $this->Name);
   }
 
   /**
-   * @param int $jobId
-   * @param int $uploadId
-   * @param string $errorMsg
-   * @param Request $request
+   * @brief Get parameters from request and add to job queue
+   * @param int $jobId        Job id to add to
+   * @param int $uploadId     Upload id to add to
+   * @param[out] string $errorMsg  Error message to display
+   * @param Request $request  HTML request
+   * @return int Job queue id
    */
   public function scheduleAgent($jobId, $uploadId, &$errorMsg, $request)
   {
-    $reuseUploadPair = explode(',', $request->get(self::UPLOAD_TO_REUSE_SELECTOR_NAME), 2);
+    $reuseUploadPair = explode(',',
+      $request->get(self::UPLOAD_TO_REUSE_SELECTOR_NAME), 2);
     if (count($reuseUploadPair) == 2) {
       list($reuseUploadId, $reuseGroupId) = $reuseUploadPair;
-    }
-    else
-    {
+    } else {
       $errorMsg .= 'no reuse upload id given';
-      return -1;
+      return - 1;
     }
     $groupId = $request->get('groupId', Auth::getGroupId());
 
-    $getReuseValue = $request->get('reuseMode');
+    $getReuseValue = $request->get('reuseMode') ?: array();
+    $reuserDependencies = array("agent_adj2nest");
 
     $reuseMode = UploadDao::REUSE_NONE;
-
-    if(!empty($getReuseValue)){
-      if(count($getReuseValue)<2){
-        if(in_array('reuseMain', $getReuseValue)){
-          $reuseMode = UploadDao::REUSE_MAIN;
-        }
-        else{
-          $reuseMode = UploadDao::REUSE_ENHANCED;
-        }
-      }
-      else{
-        $reuseMode = UploadDao::REUSE_ENH_MAIN;
+    foreach ($getReuseValue as $currentReuseValue) {
+      switch ($currentReuseValue) {
+        case 'reuseMain':
+          $reuseMode |= UploadDao::REUSE_MAIN;
+          break;
+        case 'reuseEnhanced':
+          $reuseMode |= UploadDao::REUSE_ENHANCED;
+          break;
+        case 'reuseConf':
+          $reuseMode |= UploadDao::REUSE_CONF;
+          break;
       }
     }
 
-    $this->createPackageLink($uploadId, $reuseUploadId, $groupId, $reuseGroupId, $reuseMode);
+    $reuserDependencies = array_merge($reuserDependencies,
+      $this->getReuserDependencies($request));
 
-    return $this->doAgentAdd($jobId, $uploadId, $errorMsg, array("agent_adj2nest"), $uploadId);
+    $this->createPackageLink($uploadId, $reuseUploadId, $groupId, $reuseGroupId,
+      $reuseMode);
+
+    return $this->doAgentAdd($jobId, $uploadId, $errorMsg,
+      array_unique($reuserDependencies), $uploadId);
   }
 
   /**
+   * @brief Create links between old and new upload
    * @param int $uploadId
    * @param int $reuseUploadId
    * @param int $groupId
@@ -129,8 +153,7 @@ class ReuserAgentPlugin extends AgentPlugin
 
     $package = $packageDao->findPackageForUpload($reuseUploadId);
 
-    if ($package === null)
-    {
+    if ($package === null) {
       $packageName = StringOperation::getCommonHead($uploadForReuse->getFilename(), $newUpload->getFilename());
       $package = $packageDao->createPackage($packageName ?: $uploadForReuse->getFilename());
       $packageDao->addUploadToPackage($reuseUploadId, $package);
@@ -139,6 +162,29 @@ class ReuserAgentPlugin extends AgentPlugin
     $packageDao->addUploadToPackage($uploadId, $package);
 
     $this->uploadDao->addReusedUpload($uploadId, $reuseUploadId, $groupId, $reuseGroupId, $reuseMode);
+  }
+
+  /**
+   * Add scanners as reuser dependencies.
+   * @param Request $request Symfony request
+   * @return array List of agent dependencies
+   */
+  private function getReuserDependencies($request)
+  {
+    $dependencies = array();
+    if ($request->get("Check_agent_nomos", false)) {
+      $dependencies[] = "agent_nomos";
+    }
+    if ($request->get("Check_agent_monk", false)) {
+      $dependencies[] = "agent_monk";
+    }
+    if ($request->get("Check_agent_ojo", false)) {
+      $dependencies[] = "agent_ojo";
+    }
+    if ($request->get("Check_agent_ninka", false)) {
+      $dependencies[] = "agent_ninka";
+    }
+    return $dependencies;
   }
 }
 

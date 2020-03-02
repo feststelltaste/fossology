@@ -19,10 +19,20 @@ with this program; if not, write to the Free Software Foundation, Inc.,
 
 namespace Fossology\Lib\Data;
 
-use Fossology\Lib\Util\Object;
-
-class AgentRef extends Object
+class AgentRef
 {
+
+  /**
+   * @var array $AGENT_LIST
+   * List of agents FOSSology uses to get agent ids
+   */
+  const AGENT_LIST = array(
+    'nomos' => 'N',
+    'monk' => 'M',
+    'ninka' => 'Nk',
+    'reportImport' => 'I',
+    'ojo' => 'O'
+  );
   /**
    * @var int
    */
@@ -66,10 +76,9 @@ class AgentRef extends Object
   {
     return $this->agentRevision;
   }
-  
+
   public function __toString()
   {
     return 'AgentRef(' . $this->agentId . ', ' . $this->agentName . ', ' . $this->agentRevision . ')';
   }
-
-} 
+}

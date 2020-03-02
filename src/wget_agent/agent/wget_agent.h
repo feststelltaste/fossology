@@ -47,70 +47,35 @@ typedef struct stat stat_t;
 
 #include "../../ununpack/agent/checksum.h"
 
-#define MAXCMD  2048
+#define URLMAX   3072
+#define STRMAX   2048
 #define FILEPATH 2048
 
-extern char SQL[MAXCMD];
+extern char SQL[STRMAX];
 
 /* for the DB */
 extern PGconn *pgConn;
 /* input for this system */
 extern long GlobalUploadKey;
-extern char GlobalTempFile[MAXCMD];
-extern char GlobalURL[MAXCMD];
-extern char GlobalParam[MAXCMD];
-extern char GlobalType[MAXCMD];
+extern char GlobalTempFile[STRMAX];
+extern char GlobalURL[URLMAX];
+extern char GlobalParam[STRMAX];
+extern char GlobalType[STRMAX];
 extern int GlobalImportGold; /* set to 0 to not store file in gold repository */
 extern gid_t ForceGroup;
 
 /* for debugging */
 extern int Debug;
 
-/**
- * \brief Given a filename, is it a file?
- */
 int IsFile(char *Fname, int Link);
-
-/**
- * \brief Closes the connection to the server. Also frees memory used by the PGconn object;then exit.
- */
 void SafeExit  (int rc);
-
-/**
- * \brief Get the position (ending + 1) of http|https|ftp:// of one url
- */
 int GetPosition(char *URL);
-
-/**
- * \brief Insert a file into the database and repository.
- *        This mimicks the old webgoldimport.
- */
 void DBLoadGold  ();
-
-/**
- * \brief Given a URL string, taint-protect it.
- */
 int     TaintURL(char *Sin, char *Sout, int SoutSize);
-
-/**
- * \brief Do the wget.
- */
 int GetURL(char *TempFile, char *URL, char *TempFileDir);
-
-/**
- * \brief Convert input pairs into globals.
- *        This functions taints the parameters as needed.
- */
 void SetEnv(char *S, char *TempFileDir);
-
-/**
- * \brief Substitute Hostname for %H in path
- */
 char *PathCheck (char *DirPath);
 
-/**
- * \brief Here are some suggested options
- */
 void  Usage (char *Name);
 
 int Archivefs(char *Path, char *TempFile, char *TempFileDir, struct stat Status);
@@ -120,6 +85,10 @@ int GetVersionControl();
 void GetProxy();
 
 void replace_url_with_auth();
+
+void MaskPassword();
+
+char* GetVersionControlCommand(int withPassword);
 
 #endif /* _WGET_AGENT_H */
 

@@ -20,10 +20,9 @@ with this program; if not, write to the Free Software Foundation, Inc.,
 namespace Fossology\Lib\Db;
 
 use Fossology\Lib\Exception;
-use Fossology\Lib\Util\Object;
 use Monolog\Logger;
 
-abstract class DbManager extends Object
+abstract class DbManager
 {
   /** @var Driver */
   protected $dbDriver;
@@ -56,23 +55,31 @@ abstract class DbManager extends Object
     return $this->dbDriver;
   }
 
-  public function begin() {
-    if ($this->transactionDepth==0)
-    {
+  public function begin()
+  {
+    if ($this->transactionDepth==0) {
       $this->dbDriver->begin();
     }
     $this->transactionDepth++;
-   }
+  }
 
-  public function commit() {
+  public function commit()
+  {
     $this->transactionDepth--;
-    if ($this->transactionDepth==0)
-    {
+    if ($this->transactionDepth==0) {
       $this->dbDriver->commit();
-    }
-    else if ($this->transactionDepth < 0)
-    {
+    } else if ($this->transactionDepth < 0) {
       throw new \Exception('too much transaction commits');
+    }
+  }
+
+  public function rollback()
+  {
+    if ($this->transactionDepth > 0) {
+      $this->transactionDepth--;
+      $this->dbDriver->rollback();
+    } else if ($this->transactionDepth == 0) {
+      throw new \Exception('too much transaction rollbacks');
     }
   }
 
@@ -85,7 +92,7 @@ abstract class DbManager extends Object
 
   /**
    * Note: this builds a query which is not useable with SQLite
-   * one should use SqLiteE::nsertPreparedAndReturn() instead
+   * one should use SqLiteE::insertPreparedAndReturn() instead
    *
    * @param $statementName
    * @param $sqlStatement
@@ -119,21 +126,17 @@ abstract class DbManager extends Object
    */
   protected function checkResult($result, $sqlStatement = "")
   {
-    if ($result !== false)
-    {
+    if ($result !== false) {
       return;
     }
     $lastError = "";
-    if ($this->dbDriver->isConnected())
-    {
+    if ($this->dbDriver->isConnected()) {
       $lastError = $this->dbDriver->getLastError();
       $this->logger->addCritical($lastError);
-      if ($this->transactionDepth>0)
-      {
+      if ($this->transactionDepth>0) {
         $this->dbDriver->rollback();
       }
-    } else
-    {
+    } else {
       $this->logger->addCritical("DB connection lost.");
     }
 
@@ -149,14 +152,12 @@ abstract class DbManager extends Object
    */
   public function getSingleRow($sqlStatement, $params = array(), $statementName = "")
   {
-    if (empty($statementName))
-    {
+    if (empty($statementName)) {
       $backtrace = debug_backtrace();
       $caller = $backtrace[1];
       $statementName = (array_key_exists('class', $caller) ? "$caller[class]::" : '') . "$caller[function]";
     }
-    if (!array_key_exists($statementName, $this->preparedStatements))
-    {
+    if (!array_key_exists($statementName, $this->preparedStatements)) {
       $this->prepare($statementName, $sqlStatement);
     }
     $res = $this->execute($statementName, $params);
@@ -173,14 +174,12 @@ abstract class DbManager extends Object
    */
   public function getRows($sqlStatement, $params = array(), $statementName = "")
   {
-    if (empty($statementName))
-    {
+    if (empty($statementName)) {
       $backtrace = debug_backtrace();
       $caller = $backtrace[1];
       $statementName = (array_key_exists('class', $caller) ? "$caller[class]::" : '') . "$caller[function]";
     }
-    if (!array_key_exists($statementName, $this->preparedStatements))
-    {
+    if (!array_key_exists($statementName, $this->preparedStatements)) {
       $this->prepare($statementName, $sqlStatement);
     }
     $res = $this->execute($statementName, $params);
@@ -196,8 +195,7 @@ abstract class DbManager extends Object
    */
   public function queryOnce($sqlStatement, $sqlLog = '')
   {
-    if (empty($sqlLog))
-    {
+    if (empty($sqlLog)) {
       $sqlLog = $sqlStatement;
     }
     $startTime = microtime($get_as_float = true);
@@ -242,16 +240,15 @@ abstract class DbManager extends Object
    * @param string $sqlLog
    * @return array
    */
-  public function createMap($tableName,$keyColumn,$valueColumn,$sqlLog=''){
-    if (empty($sqlLog))
-    {
+  public function createMap($tableName,$keyColumn,$valueColumn,$sqlLog='')
+  {
+    if (empty($sqlLog)) {
       $sqlLog = __METHOD__ . ".$tableName.$keyColumn,$valueColumn";
     }
     $this->prepare($sqlLog, "select $keyColumn,$valueColumn from $tableName");
     $res = $this->execute($sqlLog);
     $map = array();
-    while ($row = $this->fetchArray($res))
-    {
+    while ($row = $this->fetchArray($res)) {
       $map[$row[$keyColumn]] = $row[$valueColumn];
     }
     $this->freeResult($res);
@@ -260,16 +257,14 @@ abstract class DbManager extends Object
 
   public function flushStats()
   {
-    foreach ($this->cumulatedTime as $statementName => $seconds)
-    {
+    foreach ($this->cumulatedTime as $statementName => $seconds) {
       $queryCount = $this->queryCount[$statementName];
       $this->logger->addDebug("executing '$statementName' took "
           . $this->formatMilliseconds($seconds)
           . " ($queryCount queries" . ($queryCount > 0 ? ", avg " . $this->formatMilliseconds($seconds / $queryCount) : "") . ")");
     }
 
-    if ($this->transactionDepth != 0)
-    {
+    if ($this->transactionDepth != 0) {
       throw new \Fossology\Lib\Exception("you have not committed enough");
     }
   }
@@ -306,9 +301,8 @@ abstract class DbManager extends Object
   private function cleanupParamsArray($params)
   {
     $nParams = sizeof($params);
-    for($i=0; $i<$nParams; $i++){
-      if(is_bool($params[$i]))
-      {
+    for ($i = 0; $i<$nParams; $i++) {
+      if (is_bool($params[$i])) {
         $params[$i] = $this->dbDriver->booleanToDb($params[$i]);
       }
     }
@@ -323,20 +317,17 @@ abstract class DbManager extends Object
    */
   public function insertInto($tableName, $keys, $params, $sqlLog='', $returning='')
   {
-    if (empty($sqlLog))
-    {
+    if (empty($sqlLog)) {
       $sqlLog = __METHOD__ . ".$tableName.$keys" . (empty($returning) ? "" : md5($returning));
     }
     $sql = "INSERT INTO $tableName ($keys) VALUES (";
     $nKeys = substr_count($keys,',')+1;
-    for ($i = 1; $i < $nKeys; $i++)
-    {
+    for ($i = 1; $i < $nKeys; $i++) {
       $sql .= '$'.$i.',';
     }
     $sql .= '$'.$nKeys.')';
     $params = $this->cleanupParamsArray($params);
-    if(!empty($returning))
-    {
+    if (!empty($returning)) {
       return $this->insertPreparedAndReturn($sqlLog, $sql, $params, $returning);
     }
     $this->prepare($sqlLog,$sql);
@@ -354,8 +345,7 @@ abstract class DbManager extends Object
   {
     $params = array_values($assocParams);
     $keys = implode(',',array_keys($assocParams));
-    if (empty($sqlLog))
-    {
+    if (empty($sqlLog)) {
       $sqlLog = __METHOD__ . ".$tableName.$keys" . (empty($returning) ? "" : md5($returning));
     }
     return $this->insertInto($tableName, $keys, $params, $sqlLog, $returning);
@@ -367,14 +357,12 @@ abstract class DbManager extends Object
     $keys = array_keys($assocParams);
     $nKeys = sizeof($keys);
 
-    if (empty($sqlLog))
-    {
+    if (empty($sqlLog)) {
       $sqlLog = __METHOD__ . ".$tableName.$keys";
     }
 
     $sql = "UPDATE $tableName SET";
-    for ($i = 1; $i < $nKeys; $i++)
-    {
+    for ($i = 1; $i < $nKeys; $i++) {
       $sql .= " ".$keys[$i - 1].' = $'.$i.",";
     }
     $sql .= " ".$keys[$nKeys - 1].' = $'.$nKeys;
@@ -395,8 +383,7 @@ abstract class DbManager extends Object
    */
   public function existsTable($tableName)
   {
-    if(!preg_match('/^[a-z0-9_]+$/i',$tableName))
-    {
+    if (! preg_match('/^[a-z0-9_]+$/i',$tableName)) {
       throw new \Exception("invalid table name '$tableName'");
     }
     return $this->dbDriver->existsTable($tableName);
@@ -410,8 +397,7 @@ abstract class DbManager extends Object
    */
   public function existsColumn($tableName, $columnName)
   {
-    if(!preg_match('/^[a-z0-9_]+$/i',$columnName))
-    {
+    if (! preg_match('/^[a-z0-9_]+$/i',$columnName)) {
       throw new \Exception("invalid column name '$columnName'");
     }
     return $this->existsTable($tableName) && $this->dbDriver->existsColumn($tableName, $columnName);

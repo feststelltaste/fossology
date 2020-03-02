@@ -20,46 +20,98 @@ namespace Fossology\Lib\Application;
 
 use Fossology\Lib\BusinessRules\LicenseMap;
 use Fossology\Lib\Db\DbManager;
-use Fossology\Lib\Test\TestLiteDb;
+use Fossology\Lib\Test\TestPgDb;
 use Mockery as M;
 
-class LicenseCsvExportTest extends \PHPUnit_Framework_TestCase
+/**
+ * @class LicenseCsvExportTest
+ * @brief Test for class LicenseCsvExport
+ */
+class LicenseCsvExportTest extends \PHPUnit\Framework\TestCase
 {
+  /**
+   * @brief One time setup for test
+   * @see PHPUnit::Framework::TestCase::setUp()
+   */
   protected function setUp()
   {
     $this->assertCountBefore = \Hamcrest\MatcherAssert::getCount();
   }
 
-  protected function tearDown() {
+  /**
+   * @brief Close mockery
+   * @see PHPUnit::Framework::TestCase::tearDown()
+   */
+  protected function tearDown()
+  {
     $this->addToAssertionCount(\Hamcrest\MatcherAssert::getCount()-$this->assertCountBefore);
     M::close();
   }
-  
- 
+
+  /**
+   * @brief Test for LicenseCsvExport::createCsv()
+   * @test
+   * -# Setup test DB and insert some licenses.
+   * -# Call LicenseCsvExport::createCsv().
+   * -# Check if the file returned is correct.
+   * -# Test with different delimiters.
+   */
   public function testCreateCsv()
   {
-    $testDb = new TestLiteDb();
-    $testDb->createPlainTables(array('license_ref','license_map'));
+    $testDb = new TestPgDb("licenseCsvExport");
+    $testDb->createPlainTables(array('license_ref','license_map','groups'));
+    $testDb->createInheritedTables(array('license_candidate'));
     $dbManager = $testDb->getDbManager();
     $licenses = array();
-    for($i=1;$i<4;$i++){
-      $licenses[$i] = array('rf_pk'=>$i,'rf_shortname'=>'lic'.$i,'rf_fullname'=>'lice'.$i,
-          'rf_text'=>'text'.$i,'rf_url'=>$i.$i,'rf_notes'=>'note'.$i,'rf_source'=>'s'.$i,
-          'rf_detector_type'=>1,'rf_risk'=>($i-1));
+    $candLicenses = array();
+    $dbManager->insertTableRow('groups', array(
+      'group_pk' => 2, 'group_name' => 'test'
+    ));
+    for ($i = 1; $i < 4; $i ++) {
+      $licenses[$i] = array(
+        'rf_pk' => $i,
+        'rf_shortname' => 'lic' . $i,
+        'rf_fullname' => 'lice' . $i,
+        'rf_text' => 'text' . $i,
+        'rf_url' => $i . $i,
+        'rf_notes' => 'note' . $i,
+        'rf_source' => 's' . $i,
+        'rf_detector_type' => 1,
+        'rf_risk' => ($i - 1)
+      );
       $dbManager->insertTableRow('license_ref', $licenses[$i]);
+    }
+    for ($i = 1; $i <= 4; $i ++) {
+      $candLicenses[$i] = array(
+        'rf_pk' => $i + 4,
+        'rf_shortname' => 'candlic' . $i,
+        'rf_fullname' => 'candlice' . $i,
+        'rf_text' => 'text' . $i,
+        'rf_url' => $i . $i,
+        'rf_notes' => 'note' . $i,
+        'rf_source' => 's' . $i,
+        'rf_detector_type' => 1,
+        'rf_risk' => ($i - 1),
+        'marydone' => false,
+        'group_fk' => 2
+      );
+      if ($i % 2 == 0) {
+        $candLicenses[$i]['marydone'] = true;
+      }
+      $dbManager->insertTableRow('license_candidate', $candLicenses[$i]);
     }
 
     $dbManager->insertTableRow('license_map', array('rf_fk'=>3,'rf_parent'=>1,'usage'=>LicenseMap::CONCLUSION));
     $dbManager->insertTableRow('license_map', array('rf_fk'=>3,'rf_parent'=>2,'usage'=>LicenseMap::REPORT));
-    
+
     $licenseCsvExport = new LicenseCsvExport($dbManager);
-    $head = array('shortname','fullname','text','parent_shortname','report_shortname','url','notes','source','risk');
+    $head = array('shortname','fullname','text','parent_shortname','report_shortname','url','notes','source','risk','group');
     $out = fopen('php://output', 'w');
 
     $csv = $licenseCsvExport->createCsv();
     ob_start();
     fputcsv($out, $head);
-        fputcsv($out, array($licenses[1]['rf_shortname'],
+    fputcsv($out, array($licenses[1]['rf_shortname'],
         $licenses[1]['rf_fullname'],
         $licenses[1]['rf_text'],
         null,
@@ -67,8 +119,9 @@ class LicenseCsvExportTest extends \PHPUnit_Framework_TestCase
         $licenses[1]['rf_url'],
         $licenses[1]['rf_notes'],
         $licenses[1]['rf_source'],
-        $licenses[1]['rf_risk']));
-        
+        $licenses[1]['rf_risk'],
+        null));
+
     fputcsv($out, array($licenses[2]['rf_shortname'],
         $licenses[2]['rf_fullname'],
         $licenses[2]['rf_text'],
@@ -77,8 +130,9 @@ class LicenseCsvExportTest extends \PHPUnit_Framework_TestCase
         $licenses[2]['rf_url'],
         $licenses[2]['rf_notes'],
         $licenses[2]['rf_source'],
-        $licenses[2]['rf_risk']));
-    
+        $licenses[2]['rf_risk'],
+        null));
+
     fputcsv($out, array($licenses[3]['rf_shortname'],
         $licenses[3]['rf_fullname'],
         $licenses[3]['rf_text'],
@@ -87,11 +141,35 @@ class LicenseCsvExportTest extends \PHPUnit_Framework_TestCase
         $licenses[3]['rf_url'],
         $licenses[3]['rf_notes'],
         $licenses[3]['rf_source'],
-        $licenses[3]['rf_risk']));
+        $licenses[3]['rf_risk'],
+        null));
+
+    fputcsv($out, array($candLicenses[2]['rf_shortname'],
+      $candLicenses[2]['rf_fullname'],
+      $candLicenses[2]['rf_text'],
+      null,
+      null,
+      $candLicenses[2]['rf_url'],
+      $candLicenses[2]['rf_notes'],
+      $candLicenses[2]['rf_source'],
+      $candLicenses[2]['rf_risk'],
+      "test"));
+
+    fputcsv($out, array($candLicenses[4]['rf_shortname'],
+      $candLicenses[4]['rf_fullname'],
+      $candLicenses[4]['rf_text'],
+      null,
+      null,
+      $candLicenses[4]['rf_url'],
+      $candLicenses[4]['rf_notes'],
+      $candLicenses[4]['rf_source'],
+      $candLicenses[4]['rf_risk'],
+      "test"));
     $expected = ob_get_contents();
     ob_end_clean();
-    assertThat($csv,is(equalTo($expected)));
-    
+
+    assertThat($csv, is(equalTo($expected)));
+
     $delimiter = '|';
     $licenseCsvExport->setDelimiter($delimiter);
     $csv3 = $licenseCsvExport->createCsv(3);
@@ -105,44 +183,60 @@ class LicenseCsvExportTest extends \PHPUnit_Framework_TestCase
           $licenses[3]['rf_url'],
           $licenses[3]['rf_notes'],
           $licenses[3]['rf_source'],
-          $licenses[3]['rf_risk']),
+          $licenses[3]['rf_risk'],
+          null
+        ),
         $delimiter);
     $expected3 = ob_get_contents();
     ob_end_clean();
-    assertThat($csv3,is(equalTo($expected3)));    
+    assertThat($csv3, is(equalTo($expected3)));
   }
-  
 
-  
+  /**
+   * @brief Test for LicenseCsvExport::setDelimiter()
+   * @test
+   * -# Initialize LicenseCsvExport.
+   * -# Set a new delimiter using LicenseCsvExport::setDelimiter().
+   * -# Check if the delimiter is changed.
+   * -# Set a new delimiter using LicenseCsvExport::setDelimiter().
+   * -# Check if the delimiter is changed with only the first character passed.
+   */
   public function testSetDelimiter()
   {
-    $dbManager = M::mock(DbManager::classname());
+    $dbManager = M::mock(DbManager::class);
     $licenseCsvExport = new LicenseCsvExport($dbManager);
-    $reflection = new \ReflectionClass($licenseCsvExport); 
+    $reflection = new \ReflectionClass($licenseCsvExport);
     $delimiter = $reflection->getProperty('delimiter');
     $delimiter->setAccessible(true);
-    
+
     $licenseCsvExport->setDelimiter('|');
     assertThat($delimiter->getValue($licenseCsvExport),is('|'));
-    
+
     $licenseCsvExport->setDelimiter('<>');
     assertThat($delimiter->getValue($licenseCsvExport),is('<'));
   }
-  
+
+  /**
+   * @brief Test for LicenseCsvExport::setEnclosure()
+   * @test
+   * -# Initialize LicenseCsvExport.
+   * -# Set a new enclosure using LicenseCsvExport::setEnclosure().
+   * -# Check if the enclosure is changed.
+   * -# Set a new enclosure using LicenseCsvExport::setEnclosure().
+   * -# Check if the enclosure is changed with only the first character passed.
+   */
   public function testSetEnclosure()
   {
-    $dbManager = M::mock(DbManager::classname());
+    $dbManager = M::mock(DbManager::class);
     $licenseCsvExport = new LicenseCsvExport($dbManager);
-    $reflection = new \ReflectionClass($licenseCsvExport); 
+    $reflection = new \ReflectionClass($licenseCsvExport);
     $enclosure = $reflection->getProperty('enclosure');
     $enclosure->setAccessible(true);
-    
+
     $licenseCsvExport->setEnclosure('|');
     assertThat($enclosure->getValue($licenseCsvExport),is('|'));
-    
+
     $licenseCsvExport->setEnclosure('<>');
     assertThat($enclosure->getValue($licenseCsvExport),is('<'));
   }
-
 }
- 

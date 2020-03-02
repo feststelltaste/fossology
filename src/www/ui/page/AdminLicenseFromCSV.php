@@ -52,12 +52,12 @@ class AdminLicenseFromCSV extends DefaultPlugin
   {
     $vars = array();
 
-    if ($request->isMethod('POST'))
-    {
+    if ($request->isMethod('POST')) {
       $uploadFile = $request->files->get('file_input');
-      $delimiter = $request->get('delimiter')?:',';
-      $enclosure = $request->get('enclosure')?:'"';
-      $vars['message'] = $this->handleFileUpload($uploadFile,$delimiter,$enclosure);
+      $delimiter = $request->get('delimiter') ?: ',';
+      $enclosure = $request->get('enclosure') ?: '"';
+      $vars['message'] = $this->handleFileUpload($uploadFile, $delimiter,
+        $enclosure);
     }
 
     $vars[self::KEY_UPLOAD_MAX_FILESIZE] = ini_get(self::KEY_UPLOAD_MAX_FILESIZE);
@@ -73,20 +73,19 @@ class AdminLicenseFromCSV extends DefaultPlugin
   protected function handleFileUpload($uploadedFile,$delimiter=',',$enclosure='"')
   {
     $errMsg = '';
-    if ( !($uploadedFile instanceof UploadedFile) )
-    {
+    if (! ($uploadedFile instanceof UploadedFile)) {
       $errMsg = _("No file selected");
+    } elseif ($uploadedFile->getError() !== UPLOAD_ERR_OK) {
+      $errMsg = $uploadedFile->getErrorMessage();
+    } elseif ($uploadedFile->getSize() == 0 && $uploadedFile->getError() == 0) {
+      $errMsg = _("Larger than upload_max_filesize ") .
+        ini_get(self::KEY_UPLOAD_MAX_FILESIZE);
+    } elseif ($uploadedFile->getClientOriginalExtension() != 'csv') {
+      $errMsg = _('Invalid extension ') .
+        $uploadedFile->getClientOriginalExtension() . ' of file ' .
+        $uploadedFile->getClientOriginalName();
     }
-    elseif ($uploadedFile->getSize() == 0 && $uploadedFile->getError() == 0)
-    {
-      $errMsg = _("Larger than upload_max_filesize ") . ini_get(self::KEY_UPLOAD_MAX_FILESIZE);
-    }
-    elseif($uploadedFile->getClientOriginalExtension()!='csv')
-    {
-      $errMsg = _('Invalid extension ').$uploadedFile->getClientOriginalExtension().' of file '.$uploadedFile->getClientOriginalName();
-    }
-    if (!empty($errMsg))
-    {
+    if (! empty($errMsg)) {
       return $errMsg;
     }
     /** @var LicenseCsvImport */
@@ -95,7 +94,6 @@ class AdminLicenseFromCSV extends DefaultPlugin
     $licenseCsvImport->setEnclosure($enclosure);
     return $licenseCsvImport->handleFile($uploadedFile->getRealPath());
   }
-
 }
 
 register_plugin(new AdminLicenseFromCSV());

@@ -23,9 +23,15 @@ use Fossology\Lib\Test\TestPgDb;
 include_once(__DIR__.'/../../../lib/php/Test/Agent/AgentTestMockHelper.php');
 include_once(__DIR__.'/SchedulerTestRunner.php');
 
+/**
+ * @class SchedulerTestRunnerCli
+ * @brief Handles scheduler interaction
+ */
 class SchedulerTestRunnerCli implements SchedulerTestRunner
 {
-  /** @var TestPgDb */
+  /** @var TestPgDb $testDb
+   * Test DB
+   */
   private $testDb;
 
   public function __construct(TestPgDb $testDb)
@@ -48,15 +54,12 @@ class SchedulerTestRunnerCli implements SchedulerTestRunner
 
     $output = "";
     $retCode = -1;
-    if ($success)
-    {
+    if ($success) {
       while (($buffer = fgets($pipeFd, 4096)) !== false) {
         $output .= $buffer;
       }
       $retCode = pclose($pipeFd);
-    }
-    else
-    {
+    } else {
       print "failed opening pipe to $cmd";
     }
 

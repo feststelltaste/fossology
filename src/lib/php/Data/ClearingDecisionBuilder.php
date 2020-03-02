@@ -21,9 +21,8 @@ namespace Fossology\Lib\Data;
 
 use Fossology\Lib\Data\Clearing\ClearingEvent;
 use Fossology\Lib\Exception;
-use Fossology\Lib\Util\Object;
 
-class ClearingDecisionBuilder extends Object
+class ClearingDecisionBuilder
 {
   /** @var bool */
   private $sameFolder;
@@ -95,7 +94,7 @@ class ClearingDecisionBuilder extends Object
     $this->clearingEvents = $events;
     return $this;
   }
- 
+
   /**
    * @param int $pfileId
    * @return ClearingDecisionBuilder
@@ -200,8 +199,7 @@ class ClearingDecisionBuilder extends Object
    */
   public function build()
   {
-    if ($this->type === null)
-    {
+    if ($this->type === null) {
       throw new Exception("decision type should be set");
     }
 
@@ -209,6 +207,5 @@ class ClearingDecisionBuilder extends Object
         $this->uploadTreeId, $this->pfileId, $this->userName, $this->userId, $this->type, $this->scope,
         $this->timeStamp, $this->clearingEvents, $this->reportinfo, $this->comment, $this->acknowledgement);
   }
-
 }
 

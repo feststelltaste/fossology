@@ -17,22 +17,25 @@
 ***********************************************************/
 
 /**
- * \file common-sysconfig.php
+ * \file
  * \brief System configuration functions.
  */
 
-/** Data types for sysconfig table */
-//@{
+/** Integer type config  */
 define("CONFIG_TYPE_INT", 1);
+/** Text type config     */
 define("CONFIG_TYPE_TEXT", 2);
+/** Textarea type config */
 define("CONFIG_TYPE_TEXTAREA", 3);
+/** Password type config */
 define("CONFIG_TYPE_PASSWORD", 4);
+/** Dropdown type config */
 define("CONFIG_TYPE_DROP", 5);
-//}@
 
 
 /**
  * \brief Initialize the fossology system after bootstrap().
+ *
  * This function also opens a database connection (global PG_CONN).
  *
  * System configuration variables are in four places:
@@ -41,16 +44,18 @@ define("CONFIG_TYPE_DROP", 5);
  *  - SYSCONFDIR/Db.conf
  *  - Database sysconfig table
  *
- * VERSION and fossology.conf variables are organized by group.  For example,
+ * VERSION and fossology.conf variables are organized by group. For example,
+ * \code{.ini}
  * [DIRECTORIES]
  *   REPODIR=/srv/mydir
+ * \endcode
  *
- * but the sysconfig table and Db.conf are not.  So all the table values will be put in
- * a made up "SYSCONFIG" group.  And all the Db.conf values will be put in a
+ * But the sysconfig table and Db.conf are not. So all the table values will be put in
+ * a made up "SYSCONFIG" group. And all the Db.conf values will be put in a
  * "DBCONF" group.
  *
- * \param $sysconfdir - path to SYSCONFDIR
- * \param $SysConf - configuration variable array (updated by this function)
+ * \param string $sysconfdir   Path to SYSCONFDIR
+ * \param[out] array &$SysConf Configuration variable array (updated by this function)
  *
  * If the sysconfig table doesn't exist then create it.
  * Write records for the core variables into sysconfig table.
@@ -61,7 +66,7 @@ define("CONFIG_TYPE_DROP", 5);
  *  -  $SysConf[DIRECTORIES][MODDIR] => "/mymoduledir/
  *  -  $SysConf[VERSION][COMMIT_HASH] => "4467M"
  *
- * \Note Since so many files expect directory paths that used to be in pathinclude.php
+ * \note Since so many files expect directory paths that used to be in pathinclude.php
  * to be global, this function will define the same globals (everything in the
  * DIRECTORIES section of fossology.conf).
  */
@@ -76,8 +81,8 @@ function ConfigInit($sysconfdir, &$SysConf)
   /* Add this file contents to $SysConf, then destroy $VersionConf
    * This file can define its own groups and is eval'd.
    */
-  foreach($versionConf as $groupName => $groupArray) {
-    foreach($groupArray as $var => $assign) {
+  foreach ($versionConf as $groupName => $groupArray) {
+    foreach ($groupArray as $var => $assign) {
       $toeval = "\$$var = \"$assign\";";
       eval($toeval);
       $SysConf[$groupName][$var] = ${$var};
@@ -93,10 +98,12 @@ function ConfigInit($sysconfdir, &$SysConf)
   /* Add this file contents to $SysConf, then destroy $dbConf
    * This file can define its own groups and is eval'd.
    */
-  foreach($dbConf as $var => $val) $SysConf['DBCONF'][$var] = $val;
+  foreach ($dbConf as $var => $val) {
+    $SysConf['DBCONF'][$var] = $val;
+  }
   unset($dbConf);
 
-  /**
+  /*
    * Connect to the database.  If the connection fails,
    * DBconnect() will print a failure message and exit.
    */
@@ -119,7 +126,7 @@ function ConfigInit($sysconfdir, &$SysConf)
   $result = pg_query($PG_CONN, $sql);
   DBCheckResult($result, $sql, __FILE__, __LINE__);
 
-  while($row = pg_fetch_assoc($result)) {
+  while ($row = pg_fetch_assoc($result)) {
     $SysConf['SYSCONFIG'][$row['variablename']] = $row['conf_value'];
   }
   pg_free_result($result);
@@ -144,7 +151,9 @@ function Create_sysconfig()
   DBCheckResult($result, $sql, __FILE__, __LINE__);
   $numrows = pg_num_rows($result);
   pg_free_result($result);
-  if ($numrows > 0) return 0;
+  if ($numrows > 0) {
+    return 0;
+  }
 
   /* Create the sysconfig table */
   $sql = "
@@ -243,7 +252,9 @@ function Populate_sysconfig()
   $variable = "FOSSologyURL";
   $urlPrompt = _("FOSSology URL");
   $hostname = exec("hostname -f");
-  if (empty($hostname)) $hostname = "localhost";
+  if (empty($hostname)) {
+    $hostname = "localhost";
+  }
   $fossologyURL = $hostname."/repo/";
   $urlDesc = _("URL of this FOSSology server, e.g. $fossologyURL");
   $urlValid = "check_fossology_url";
@@ -339,11 +350,17 @@ function Populate_sysconfig()
   $valueArray[$variable] = array("'$variable'", "'L'", "'$smtpAuthPrompt'",
     strval(CONFIG_TYPE_DROP), "'SMTP'", "3", "'$smtpAuthDesc'", "null", "'Login{L}|None{N}|Plain{P}'");
 
+  $variable = "SMTPFrom";
+  $smtpFrom = _('SMTP Email');
+  $smtpFromDesc = _('e.g.: "user@domain.com"<br>Sender email.');
+  $valueArray[$variable] = array("'$variable'", "null", "'$smtpFrom'",
+    strval(CONFIG_TYPE_TEXT), "'SMTP'", "4", "'$smtpFromDesc'", "'check_email_address'", "null");
+
   $variable = "SMTPAuthUser";
   $smtpAuthUserPrompt = _('SMTP User');
-  $smtpAuthUserDesc = _('e.g.: "user@domain.com"<br>Email to be used for login in SMTP and for from address.');
+  $smtpAuthUserDesc = _('e.g.: "user"<br>Login to be used for login on SMTP Server.');
   $valueArray[$variable] = array("'$variable'", "null", "'$smtpAuthUserPrompt'",
-    strval(CONFIG_TYPE_TEXT), "'SMTP'", "4", "'$smtpAuthUserDesc'", "'check_email_address'", "null");
+    strval(CONFIG_TYPE_TEXT), "'SMTP'", "5", "'$smtpAuthUserDesc'", "null", "null");
 
   $variable = "SMTPAuthPasswd";
   $smtpAuthPasswdPrompt = _('SMTP Login Password');
@@ -363,29 +380,37 @@ function Populate_sysconfig()
   $valueArray[$variable] = array("'$variable'", "'1'", "'$smtpTlsPrompt'",
     strval(CONFIG_TYPE_DROP), "'SMTP'", "7", "'$smtpTlsDesc'", "null", "'Yes{1}|No{2}'");
 
+  $variable = "PATMaxExipre";
+  $patTokenValidityPrompt = _('Max token validity');
+  $patTokenValidityDesc = _('Maximum validity of tokens (in days)');
+  $valueArray[$variable] = array("'$variable'", "30", "'$patTokenValidityPrompt'",
+    strval(CONFIG_TYPE_INT), "'PAT'", "1", "'$patTokenValidityDesc'", "null", "null");
 
   /* Doing all the rows as a single insert will fail if any row is a dupe.
    So insert each one individually so that new variables get added.
   */
   foreach ($valueArray as $variable => $values) {
-    /* Check if the variable already exists.  Insert it if it does not.
+    /*
+     * Check if the variable already exists. Insert it if it does not.
      * This is better than an insert ignoring duplicates, because that
-    * generates a postresql log message.
-    */
+     * generates a postresql log message.
+     */
     $VarRec = GetSingleRec("sysconfig", "WHERE variablename='$variable'");
     if (empty($VarRec)) {
-      $sql = "INSERT INTO sysconfig (" . implode(",", $columns) . ") VALUES ("
-        . implode(",", $values) . ");";
+      $sql = "INSERT INTO sysconfig (" . implode(",", $columns) . ") VALUES (" .
+        implode(",", $values) . ");";
       $result = pg_query($PG_CONN, $sql);
       DBCheckResult($result, $sql, __FILE__, __LINE__);
       pg_free_result($result);
     } else { // Values exist, update them
       $updateString = [];
       foreach ($columns as $index => $column) {
-        if ($index != 0 && $index != 1) // Skip variablename and conf_value
+        if ($index != 0 && $index != 1) { // Skip variablename and conf_value
           $updateString[] = $column . "=" . $values[$index];
+        }
       }
-      $sql = "UPDATE sysconfig SET ". implode(",", $updateString) ." WHERE variablename='$variable';";
+      $sql = "UPDATE sysconfig SET " . implode(",", $updateString) .
+        " WHERE variablename='$variable';";
       $result = pg_query($PG_CONN, $sql);
       DBCheckResult($result, $sql, __FILE__, __LINE__);
       pg_free_result($result);
@@ -411,7 +436,9 @@ function Create_option_value()
   DBCheckResult($result, $sql, __FILE__, __LINE__);
   $numrows = pg_num_rows($result);
   pg_free_result($result);
-  if ($numrows > 0) return 0;
+  if ($numrows > 0) {
+    return 0;
+  }
 
   /* Create the option_value column */
   $sql = "ALTER TABLE sysconfig ADD COLUMN option_value character varying(40) DEFAULT NULL;";
@@ -431,17 +458,18 @@ function Create_option_value()
 }
 
 /**
- * \brief validation function check_boolean().
- * check if the value format is valid,
+ * \brief Validation function check_boolean().
+ *
+ * Check if the value format is valid,
  * only true/false is valid
  *
- * \param $value - the value which will be checked
+ * \param string $value The value which will be checked
  *
  * \return 1, if the value is valid, or 0
  */
 function check_boolean($value)
 {
-  if (!strcmp($value, 'true') || !strcmp($value, 'false')) {
+  if (! strcmp($value, 'true') || ! strcmp($value, 'false')) {
     return 1;
   } else {
     return 0;
@@ -449,10 +477,11 @@ function check_boolean($value)
 }
 
 /**
- * \brief validation function check_fossology_url().
- * check if the url is valid,
+ * \brief Validation function check_fossology_url().
  *
- * \param $url - the url which will be checked
+ * Check if the URL is valid.
+ *
+ * \param string $url The URL which will be checked
  *
  * \return  1: valid, 0: invalid
  */
@@ -460,12 +489,16 @@ function check_fossology_url($url)
 {
   $url_array = explode("/", $url, 2);
   $name = $url_array[0];
-  if (!empty($name)) {
+  if (! empty($name)) {
     $hostname = exec("hostname -f");
-    if (empty($hostname)) $hostname = "localhost";
-    if(check_IP($name)) {
+    if (empty($hostname)) {
+      $hostname = "localhost";
+    }
+    if (check_IP($name)) {
       $hostname1 = gethostbyaddr($name);
-      if (strcmp($hostname, $hostname1) == 0)  return 0;  // host is not reachable
+      if (strcmp($hostname, $hostname1) == 0) {
+        return 0; // host is not reachable
+      }
     }
     $server_name = $_SERVER['SERVER_NAME'];
 
@@ -473,35 +506,41 @@ function check_fossology_url($url)
     if (strcmp($name, $hostname) && strcmp($name, $server_name)) {
       return 0;
     }
-  } else return 0;
+  } else {
+    return 0;
+  }
   return 1;
 }
 
 /**
- * \brief validation function check_logo_url().
- * check if the url is available,
+ * \brief Validation function check_logo_url().
  *
- * \param $url - the url which will be checked
+ * Check if the URL is available.
+ *
+ * \param string $url The URL which will be checked
  *
  * \return 1: available, 0: unavailable
  */
 function check_logo_url($url)
 {
-  if (empty($url)) return 1; /* logo url can be null, with the default */
-
-  //$res = check_url($url);
+  if (empty($url)) {
+    return 1; /* logo url can be null, with the default */
+  }
+  // $res = check_url($url);
   $res = is_available($url);
   if (1 == $res) {
     return 1;
+  } else {
+    return 0;
   }
-  else return 0;
 }
 
 /**
- * \brief validation function check_logo_image_url().
- * check if the url is available,
+ * \brief Validation function check_logo_image_url().
  *
- * \param $url - the url which will be checked
+ * Check if the URL is available.
+ *
+ * \param string $url The url which will be checked
  *
  * \return 1: the url is available, 0: unavailable
  */
@@ -509,23 +548,26 @@ function check_logo_image_url($url)
 {
   global $SysConf;
 
-  if (empty($url)) return 1; /* logo url can be null, with the default */
-
+  if (empty($url)) {
+    return 1; /* logo url can be null, with the default */
+  }
   $logoLink = @$SysConf["LogoLink"];
-  $new_url = $logoLink.$url;
+  $new_url = $logoLink . $url;
   if (is_available($url) || is_available($new_url)) {
     return 1;
+  } else {
+    return 0;
   }
-  else return 0;
 
 }
 
 /**
- * \brief validation function check_email_address().
- * implement this function if needed in the future
- * check if the email address is valid
+ * \brief Validation function check_email_address().
  *
- * \param $email_address - the email address which will be checked
+ * Check if the email address is valid.
+ * \todo Implement this function if needed in the future.
+ *
+ * \param string $email_address The email address which will be checked
  *
  * \return 1: valid, 0: invalid
  */
@@ -535,11 +577,11 @@ function check_email_address($email_address)
 }
 
 /**
- * \brief check if the url is available
+ * \brief Check if the URL is available
  *
- * \param $url - url
- * \param $timeout - timeout interval, default 2 seconds
- * \param $tries - if unavailable, will try several times, default 2 times
+ * \param string $url  URL
+ * \param int $timeout Timeout interval, default 2 seconds
+ * \param int $tries   If unavailable, will try several times, default 2 times
  *
  * \return 1: available, 0: unavailable
  */
@@ -548,40 +590,51 @@ function is_available($url, $timeout = 2, $tries = 2)
   global $SysConf;
 
   $proxyStmts = "";
-  if (array_key_exists('http_proxy', $SysConf['FOSSOLOGY']) && $SysConf['FOSSOLOGY']['http_proxy'])
+  if (array_key_exists('http_proxy', $SysConf['FOSSOLOGY']) &&
+    $SysConf['FOSSOLOGY']['http_proxy']) {
     $proxyStmts .= "export http_proxy={$SysConf['FOSSOLOGY']['http_proxy']};";
-  if (array_key_exists('https_proxy', $SysConf['FOSSOLOGY']) && $SysConf['FOSSOLOGY']['https_proxy'])
+  }
+  if (array_key_exists('https_proxy', $SysConf['FOSSOLOGY']) &&
+    $SysConf['FOSSOLOGY']['https_proxy']) {
     $proxyStmts .= "export https_proxy={$SysConf['FOSSOLOGY']['https_proxy']};";
-  if (array_key_exists('ftp_proxy', $SysConf['FOSSOLOGY']) && $SysConf['FOSSOLOGY']['ftp_proxy'])
+  }
+  if (array_key_exists('ftp_proxy', $SysConf['FOSSOLOGY']) &&
+    $SysConf['FOSSOLOGY']['ftp_proxy']) {
     $proxyStmts .= "export ftp_proxy={$SysConf['FOSSOLOGY']['ftp_proxy']};";
+  }
 
   $commands = "$proxyStmts wget --spider '$url' --tries=$tries --timeout=$timeout";
   system($commands, $return_var);
   if (0 == $return_var) {
     return 1;
-  } else return 0;
+  } else {
+    return 0;
+  }
 }
 
 /**
- * \brief check if the url is valid
- * \param $url - the url which will be checked
+ * \brief Check if the url is valid
+ * \param string $url The url which will be checked
  * \return 1: the url is valid, 0: invalid
  */
 function check_url($url)
 {
-  if (empty($url) || preg_match("@^((http)|(https)|(ftp))://([[:alnum:]]+)@i", $url) != 1 || preg_match("@[[:space:]]@", $url) != 0) {
+  if (empty($url) ||
+    preg_match("@^((http)|(https)|(ftp))://([[:alnum:]]+)@i", $url) != 1 ||
+    preg_match("@[[:space:]]@", $url) != 0) {
     return 0;
+  } else {
+    return 1;
   }
-  else return 1;
 }
 
 /**
- * \brief check if the ip address is valid
- * \param $ip - IP address
+ * \brief Check if the ip address is valid
+ * \param string $ip IP address
  * \return 1: yes
  */
 function check_IP($ip)
 {
-  $e="([0-9]|1[0-9]{2}|[1-9][0-9]|2[0-4][0-9]|25[0-5])";
+  $e = "([0-9]|1[0-9]{2}|[1-9][0-9]|2[0-4][0-9]|25[0-5])";
   return preg_match("/^$e\.$e\.$e\.$e$/", $ip);
 }

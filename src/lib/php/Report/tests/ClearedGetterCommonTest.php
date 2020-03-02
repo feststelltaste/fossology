@@ -18,8 +18,8 @@ with this program; if not, write to the Free Software Foundation, Inc.,
 
 namespace Fossology\Lib\Report;
 
-use Fossology\Lib\Dao\UploadDao;
 use Fossology\Lib\Dao\TreeDao;
+use Fossology\Lib\Dao\UploadDao;
 use Mockery as M;
 use Mockery\MockInterface;
 
@@ -49,9 +49,11 @@ class WeirdCharClearedGetter extends ClearedGetterCommon
     parent::__construct($groupBy);
   }
 
-  protected function getStatements($uploadId, $uploadTreeTableName, $userId = null, $groupId=null){}
+  protected function getStatements($uploadId, $uploadTreeTableName, $userId = null, $groupId=null)
+  {
+  }
 
-  public function getCleared($uploadId, $groupId=null, $extended = true, $agentcall = NULL)
+  public function getCleared($uploadId, $groupId=null, $extended = true, $agentcall = NULL, $isUnifiedReport = false)
   {
     return array(
       array("good" => "漢", "esc" => "escape", "uml" => ' ü ')
@@ -59,7 +61,7 @@ class WeirdCharClearedGetter extends ClearedGetterCommon
   }
 }
 
-class ClearedComonReportTest extends \PHPUnit_Framework_TestCase
+class ClearedComonReportTest extends \PHPUnit\Framework\TestCase
 {
   /** @var UploadDao|MockInterface */
   private $uploadDao;
@@ -68,8 +70,8 @@ class ClearedComonReportTest extends \PHPUnit_Framework_TestCase
 
   protected function setUp()
   {
-    $this->uploadDao = M::mock(UploadDao::classname());
-    $this->treeDao = M::mock(TreeDao::classname());
+    $this->uploadDao = M::mock(UploadDao::class);
+    $this->treeDao = M::mock(TreeDao::class);
 
     $container = M::mock('ContainerBuilder');
     $GLOBALS['container'] = $container;

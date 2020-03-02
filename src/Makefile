@@ -21,13 +21,14 @@ DIRS = \
 	maintagent \
 	mimetype \
 	monk \
-	ninka \
 	nomos \
+	ojo \
 	pkgagent \
 	readmeoss \
 	unifiedreport \
 	reuser \
 	scheduler \
+	softwareHeritage \
 	spdx2 \
 	reportImport \
 	ununpack \
